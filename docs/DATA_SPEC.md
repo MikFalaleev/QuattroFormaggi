@@ -1,6 +1,6 @@
 # DATA_SPEC.md — спецификация данных
 
-**Статус:** заполнены разделы «Источник» (шаг 2), «Факты о таблицах» (шаг 3) и контракт данных (шаг 4): схема `card_v1`, правило `missing_fields`, единицы и округление, сериализация, города RU/EN, задачи, формат SFT-записи, `group_id`. Остальное заполняется на шагах 6–8 `IMPLEMENTATION_PLAN.md`:
+**Статус:** заполнены разделы «Источник» (шаг 2), «Факты о таблицах» (шаг 3) и контракт данных (шаг 4): схема `card_v1`, правило `missing_fields`, единицы и округление, сериализация, российские города и замена американских городов источника (D-047), задачи, формат SFT-записи, `group_id`. Остальное заполняется на шагах 6–8 `IMPLEMENTATION_PLAN.md`:
 
 - шаги 6–7 — генератор, сплиты и защита от утечек;
 - шаг 8 — состав замороженного benchmark.
@@ -78,10 +78,10 @@
 | `cargo_category` | строка или `null` | `general`, `retail`, `consumer_goods`, `food_beverage`, `automotive`, `electronics` | `customers.primary_freight_type` — **прокси**: это основной тип грузов клиента, а не категория конкретного груза |
 | `equipment_type` | строка или `null` | `dry_van`, `reefer` | `loads.load_type`: `Dry Van` → `dry_van`, `Refrigerated` → `reefer` |
 | `pieces` | целое или `null` | ≥ 1 | `loads.pieces` |
-| `weight_total` | `{value, unit}` или `null` | `value` > 0, `unit`: `kg`, `t`, `lb` | масса из текста, как написана (см. «Единицы») |
+| `weight_total` | `{value, unit}` или `null` | `value` > 0, `unit`: `kg`, `t`, `lb` | масса из текста, как написана (см. «Единицы»); в синтетических заявках только `kg` и `t` |
 | `weight_per_piece` | `{value, unit}` или `null` | как у `weight_total` | масса одного места из текста; в одной записи задан либо `weight_total`, либо `weight_per_piece` |
-| `origin` | `{city, state}` или `null` | каноническое английское имя города из `routes` и двухбуквенный код штата | `routes.origin_*` |
-| `destination` | `{city, state}` или `null` | то же | `routes.destination_*` |
+| `origin` | `{city, region}` или `null` | каноническое русское название города и официальное название субъекта РФ из справочника (раздел «Города») | `routes.origin_city`, заменённый российским городом по `configs/data/city_map_ru_v1.yaml` |
+| `destination` | `{city, region}` или `null` | то же | `routes.destination_city`, так же |
 | `pickup_date` | строка `YYYY-MM-DD` или `null` | ISO-дата | дата `Pickup.scheduled_datetime` (= `load_date`) |
 | `delivery_date` | строка `YYYY-MM-DD` или `null` | ISO-дата | дата `Delivery.scheduled_datetime` |
 | `temperature_c` | число или `null` | — | **в `card_v1` всегда `null`**: в источнике нет температурного режима. Для `reefer` поэтому всегда попадает в `missing_fields` |
@@ -89,7 +89,7 @@
 Правила значений:
 
 - **Масса копируется из текста** значением и единицей («12,6 т» → `{"value":12.6,"unit":"t"}`). Модель не пересчитывает единицы: это делает код (D-004).
-- **Города** — каноническое английское имя и код штата, даже если в тексте город написан по-русски: «Хьюстон, Техас» → `{"city":"Houston","state":"TX"}`.
+- **Города** — каноническое русское название и регион из справочника, даже если в тексте город написан по-английски или без региона: «Kazan» → `{"city":"Казань","region":"Республика Татарстан"}`, «из Москвы» → `{"city":"Москва","region":"Москва"}`. Регион модель выдаёт всегда: для 20 городов справочника он однозначен, даже если в заявке его нет (D-048).
 - **Даты** — ISO `YYYY-MM-DD`. Относительные даты («завтра») считаются от даты запроса, которая всегда стоит в первой строке сообщения пользователя.
 - **Конфликты.** Если в тексте у поля два разных значения, поле в `card` равно `null`, а в `conflicts` добавляется `{"field": <имя поля>, "values": [<значение 1>, <значение 2>, …]}`: не меньше двух **различных** значений; одно поле — не больше одного раза. Обязательное поле с конфликтом попадает в `missing_fields` по общему правилу.
 
@@ -102,19 +102,19 @@
 Полная карточка, ничего не пропущено:
 
 ```json
-{"card":{"shipper_name":"National Retail","cargo_category":"retail","equipment_type":"dry_van","pieces":22,"weight_total":{"value":27761,"unit":"lb"},"weight_per_piece":null,"origin":{"city":"Kansas City","state":"MO"},"destination":{"city":"Indianapolis","state":"IN"},"pickup_date":"2022-01-01","delivery_date":"2022-01-02","temperature_c":null},"missing_fields":[],"conflicts":[]}
+{"card":{"shipper_name":"National Retail","cargo_category":"retail","equipment_type":"dry_van","pieces":22,"weight_total":{"value":12592,"unit":"kg"},"weight_per_piece":null,"origin":{"city":"Пермь","region":"Пермский край"},"destination":{"city":"Самара","region":"Самарская область"},"pickup_date":"2022-01-01","delivery_date":"2022-01-02","temperature_c":null},"missing_fields":[],"conflicts":[]}
 ```
 
-Рефрижератор, масса одного места («18 паллет по 572 кг»), без отправителя и даты доставки — не хватает только температуры:
+Рефрижератор из Санкт-Петербурга в Казань, масса одного места («18 паллет по 572 кг»), без отправителя и даты доставки — не хватает только температуры:
 
 ```json
-{"card":{"shipper_name":null,"cargo_category":"food_beverage","equipment_type":"reefer","pieces":18,"weight_total":null,"weight_per_piece":{"value":572,"unit":"kg"},"origin":{"city":"Houston","state":"TX"},"destination":{"city":"Chicago","state":"IL"},"pickup_date":"2023-03-14","delivery_date":null,"temperature_c":null},"missing_fields":["temperature_c"],"conflicts":[]}
+{"card":{"shipper_name":null,"cargo_category":"food_beverage","equipment_type":"reefer","pieces":18,"weight_total":null,"weight_per_piece":{"value":572,"unit":"kg"},"origin":{"city":"Санкт-Петербург","region":"Санкт-Петербург"},"destination":{"city":"Казань","region":"Республика Татарстан"},"pickup_date":"2023-03-14","delivery_date":null,"temperature_c":null},"missing_fields":["temperature_c"],"conflicts":[]}
 ```
 
 Город отправления не указан, а масса указана дважды по-разному («12,6 т … по накладной 14,1 т»):
 
 ```json
-{"card":{"shipper_name":null,"cargo_category":null,"equipment_type":"dry_van","pieces":22,"weight_total":null,"weight_per_piece":null,"origin":null,"destination":{"city":"Indianapolis","state":"IN"},"pickup_date":"2022-01-01","delivery_date":"2022-01-02","temperature_c":null},"missing_fields":["origin","weight_total"],"conflicts":[{"field":"weight_total","values":[{"value":12.6,"unit":"t"},{"value":14.1,"unit":"t"}]}]}
+{"card":{"shipper_name":null,"cargo_category":null,"equipment_type":"dry_van","pieces":22,"weight_total":null,"weight_per_piece":null,"origin":null,"destination":{"city":"Самара","region":"Самарская область"},"pickup_date":"2022-01-01","delivery_date":"2022-01-02","temperature_c":null},"missing_fields":["origin","weight_total"],"conflicts":[{"field":"weight_total","values":[{"value":12.6,"unit":"t"},{"value":14.1,"unit":"t"}]}]}
 ```
 
 ## Правило `missing_fields`
@@ -145,11 +145,11 @@
 | `from_kg(kg, unit)` | обратный пересчёт без округления (для генератора) |
 | `normalize_number(x)` | целое число с плавающей точкой → целое (`13.0` → `13`) |
 
-Число массы **в тексте запроса** получается из исходных фунтов функцией `render_value_from_lbs(lbs, unit)`; единицу выбирает генератор (шаг 6):
+Число массы **в тексте запроса** получается из исходных фунтов функцией `render_value_from_lbs(lbs, unit)`; единицу выбирает генератор (шаг 6). **В синтетических заявках только килограммы и тонны** (D-049): в российских заявках фунтов не бывает. Схема `lb` по-прежнему допускает — реальная заявка может прийти в фунтах, и модель должна переписать её как есть:
 
 | Единица | Правило | Тип `value` | Пример для 27 761 lb |
 |---|---|---|---|
-| `lb` | целое, как в источнике | целое | `27761` |
+| `lb` | целое, как в источнике (в синтетике не используется) | целое | `27761` |
 | `kg` | округление до целого | целое | `12592` (точно 12 592,19 кг) |
 | `t` | округление до 0,1 т; целая тонна пишется без `.0` | дробное или целое | `12.6` (28 660 lb → `13`) |
 
@@ -166,32 +166,71 @@
 
 ## Города
 
-20 городов датасета; у каждого ровно один штат (`qf/domain/geo.py`, `CITIES`). `canonical_place(city_en, state)` возвращает значение для карточки, а для неизвестного города или чужого штата — `KeyError`. Русские названия — ручной перевод, проверяемый человеком.
+### Российские города карточки
 
-| Город (EN, канон) | Штат | Штат (EN) | Город (RU) | Штат (RU) |
-|---|---|---|---|---|
-| Atlanta | GA | Georgia | Атланта | Джорджия |
-| Charlotte | NC | North Carolina | Шарлотт | Северная Каролина |
-| Chicago | IL | Illinois | Чикаго | Иллинойс |
-| Columbus | OH | Ohio | Колумбус | Огайо |
-| Dallas | TX | Texas | Даллас | Техас |
-| Denver | CO | Colorado | Денвер | Колорадо |
-| Detroit | MI | Michigan | Детройт | Мичиган |
-| Houston | TX | Texas | Хьюстон | Техас |
-| Indianapolis | IN | Indiana | Индианаполис | Индиана |
-| Kansas City | MO | Missouri | Канзас-Сити | Миссури |
-| Las Vegas | NV | Nevada | Лас-Вегас | Невада |
-| Los Angeles | CA | California | Лос-Анджелес | Калифорния |
-| Memphis | TN | Tennessee | Мемфис | Теннесси |
-| Miami | FL | Florida | Майами | Флорида |
-| Minneapolis | MN | Minnesota | Миннеаполис | Миннесота |
-| New York | NY | New York | Нью-Йорк | Нью-Йорк |
-| Philadelphia | PA | Pennsylvania | Филадельфия | Пенсильвания |
-| Phoenix | AZ | Arizona | Финикс | Аризона |
-| Portland | OR | Oregon | Портленд | Орегон |
-| Seattle | WA | Washington | Сиэтл | Вашингтон |
+По решению пользователя (23.09.2026, D-047) модель работает с **российскими** городами. Справочник — 20 городов (`qf/domain/geo.py`, `CITIES`): все 16 городов-миллионников и Тула, Томск, Кемерово, Барнаул. Для каждого:
 
-Тесты сверяют таблицу с маршрутами фикстуры, с реальным `routes.csv` (если датасет скачан) и с `configs/data/expectations.yaml`.
+- каноническое русское название — значение `city` в карточке;
+- регион — официальное название субъекта РФ (Конституция РФ, ст. 65) — значение `region`; у городов федерального значения регион совпадает с городом;
+- английские названия города и региона (заголовки статей английской Википедии) — для английских заявок;
+- формы «из …» и «в …» (родительный и винительный падежи) — для русских текстов;
+- координаты — для проверки расстояний.
+
+`canonical_place(city)` возвращает значение для карточки, а для неизвестного города — `KeyError`. Названия, английские варианты и координаты взяты из русской Википедии; принадлежность каждого города своему региону сверена с Wikidata (свойство P131) 23.09.2026: совпали все 20. Падежные формы написаны вручную.
+
+| Город | Регион | Город (EN) | Регион (EN) | Откуда | Куда |
+|---|---|---|---|---|---|
+| Москва | Москва | Moscow | Moscow | из Москвы | в Москву |
+| Санкт-Петербург | Санкт-Петербург | Saint Petersburg | Saint Petersburg | из Санкт-Петербурга | в Санкт-Петербург |
+| Тула | Тульская область | Tula | Tula Oblast | из Тулы | в Тулу |
+| Воронеж | Воронежская область | Voronezh | Voronezh Oblast | из Воронежа | в Воронеж |
+| Ростов-на-Дону | Ростовская область | Rostov-on-Don | Rostov Oblast | из Ростова-на-Дону | в Ростов-на-Дону |
+| Краснодар | Краснодарский край | Krasnodar | Krasnodar Krai | из Краснодара | в Краснодар |
+| Волгоград | Волгоградская область | Volgograd | Volgograd Oblast | из Волгограда | в Волгоград |
+| Нижний Новгород | Нижегородская область | Nizhny Novgorod | Nizhny Novgorod Oblast | из Нижнего Новгорода | в Нижний Новгород |
+| Казань | Республика Татарстан | Kazan | Tatarstan | из Казани | в Казань |
+| Самара | Самарская область | Samara | Samara Oblast | из Самары | в Самару |
+| Уфа | Республика Башкортостан | Ufa | Bashkortostan | из Уфы | в Уфу |
+| Пермь | Пермский край | Perm | Perm Krai | из Перми | в Пермь |
+| Екатеринбург | Свердловская область | Yekaterinburg | Sverdlovsk Oblast | из Екатеринбурга | в Екатеринбург |
+| Челябинск | Челябинская область | Chelyabinsk | Chelyabinsk Oblast | из Челябинска | в Челябинск |
+| Омск | Омская область | Omsk | Omsk Oblast | из Омска | в Омск |
+| Новосибирск | Новосибирская область | Novosibirsk | Novosibirsk Oblast | из Новосибирска | в Новосибирск |
+| Барнаул | Алтайский край | Barnaul | Altai Krai | из Барнаула | в Барнаул |
+| Томск | Томская область | Tomsk | Tomsk Oblast | из Томска | в Томск |
+| Кемерово | Кемеровская область — Кузбасс | Kemerovo | Kemerovo Oblast | из Кемерово | в Кемерово |
+| Красноярск | Красноярский край | Krasnoyarsk | Krasnoyarsk Krai | из Красноярска | в Красноярск |
+
+### Замена американских городов источника
+
+Сырой датасет не меняется: в `routes.csv` остаются американские города, их проверяет `qf data profile`. На шаге 5, при сборке фактов о загрузке, каждый город источника заменяется российским по фиксированной таблице `configs/data/city_map_ru_v1.yaml` (класс `qf.data.CityMap`; хэш файла пишется в манифест запуска). Таблица взаимно однозначна: 20 городов источника → 20 городов справочника, поэтому маршрут никогда не превращается в «из города в тот же город», а `route_id` и отложенные для `test_ood` маршруты сохраняются.
+
+| Город источника | Город карточки |
+|---|---|
+| Atlanta | Воронеж |
+| Charlotte | Ростов-на-Дону |
+| Chicago | Казань |
+| Columbus | Волгоград |
+| Dallas | Екатеринбург |
+| Denver | Омск |
+| Detroit | Уфа |
+| Houston | Санкт-Петербург |
+| Indianapolis | Самара |
+| Kansas City | Пермь |
+| Las Vegas | Кемерово |
+| Los Angeles | Красноярск |
+| Memphis | Нижний Новгород |
+| Miami | Краснодар |
+| Minneapolis | Челябинск |
+| New York | Тула |
+| Philadelphia | Москва |
+| Phoenix | Томск |
+| Portland | Барнаул |
+| Seattle | Новосибирск |
+
+**Почему именно так.** Срок доставки в источнике растёт с длиной маршрута (корреляция срока с расстоянием 0,85: до ~800 км — в основном тот же день, 3 000–5 000 км — 2–3 дня). Поэтому соответствие подобрано так, чтобы расстояния между российскими городами повторяли расстояния американских маршрутов: оценка «расстояние по прямой × 1,2» против дорожного расстояния источника по 58 маршрутам — корреляция 0,94, медианное отклонение 16%, худшее — 43%. Это проверяет `tests/test_city_map.py`.
+
+**Ограничения (записываются в модельную карточку).** Даты и сроки доставки взяты из американского источника; реальные сроки перевозки по России они не отражают (в источнике около 2 000 км в сутки). Реального дорожного расстояния между российскими городами в данных нет, поэтому оно не используется ни в карточке, ни в тексте заявок.
 
 ## Задачи модели
 
@@ -220,14 +259,14 @@
 | `split` | `train` \| `val` \| `test` \| `test_ood` \| `bench` \| `null` | сплит; `null` — ещё не назначен |
 | `messages` | список | ровно три сообщения `system`, `user`, `assistant` в этом порядке; у каждого `role` и `content` |
 
-`VariantInfo`: `weight_unit` (`kg`/`t`/`lb`/`null`), `weight_mode` (`total`/`per_piece`/`none`), `dropped_fields` (поля, убранные из текста), `hard_cases` (имена трудных случаев из реестра `HARD_CASES`, шаг 6), `request_date` (синтетическая дата запроса; в источнике её нет), `date_style` (`iso`/`text`/`relative`), `city_lang` (`ru`/`en`). На шаге 6 добавится `ood_reason`.
+`VariantInfo`: `weight_unit` (`kg`/`t`/`lb`/`null`; в синтетике `lb` не встречается), `weight_mode` (`total`/`per_piece`/`none`), `dropped_fields` (поля, убранные из текста), `hard_cases` (имена трудных случаев из реестра `HARD_CASES`, шаг 6), `request_date` (синтетическая дата запроса; в источнике её нет), `date_style` (`iso`/`text`/`relative`), `city_lang` (`ru`/`en` — на каком языке город написан в тексте). На шаге 6 добавится `ood_reason`.
 
 Сообщение пользователя начинается с даты запроса (`Дата запроса: YYYY-MM-DD` или `Request date: YYYY-MM-DD`, шаг 6). Содержимое ответа ассистента — каноническая сериализация `ExtractionTarget`.
 
 Пример записи (в файле — одна строка; системный промпт и текст запроса сокращены):
 
 ```json
-{"id":"qf-train-LOAD00001-0","task":"shipment_extraction","group_id":"load:LOAD00001","source_id":"yogape/logistics-operations@54e7d1d1a437:LOAD00001","language":"ru","reviewed":false,"synthetic":true,"template_family":"T1","variant":{"weight_unit":"lb","weight_mode":"total","dropped_fields":[],"hard_cases":[],"request_date":"2021-12-28","date_style":"iso","city_lang":"en"},"schema_version":"card_v1","split":"train","messages":[{"role":"system","content":"…"},{"role":"user","content":"Дата запроса: 2021-12-28\n\n…"},{"role":"assistant","content":"{\"card\":{\"shipper_name\":\"National Retail\",…},\"missing_fields\":[],\"conflicts\":[]}"}]}
+{"id":"qf-train-LOAD00001-0","task":"shipment_extraction","group_id":"load:LOAD00001","source_id":"yogape/logistics-operations@54e7d1d1a437:LOAD00001","language":"ru","reviewed":false,"synthetic":true,"template_family":"T1","variant":{"weight_unit":"kg","weight_mode":"total","dropped_fields":[],"hard_cases":[],"request_date":"2021-12-28","date_style":"iso","city_lang":"ru"},"schema_version":"card_v1","split":"train","messages":[{"role":"system","content":"…"},{"role":"user","content":"Дата запроса: 2021-12-28\n\n…"},{"role":"assistant","content":"{\"card\":{\"shipper_name\":\"National Retail\",…},\"missing_fields\":[],\"conflicts\":[]}"}]}
 ```
 
 Проверки одной записи — `qf.domain.check_record(record)`; коды: `UNKNOWN_TASK` (задачи нет в `TASKS`), `EMPTY_ASSISTANT`, `TARGET_PARSE` (ответ не разбирается строго), `NOT_CANONICAL`, `TARGET_INCONSISTENT` (нарушено правило `missing_fields` или конфликтов). Межзаписные проверки (утечки, дубликаты) добавит `qf validate-data` на шаге 7.

@@ -72,7 +72,7 @@ def test_unknown_task_rejected() -> None:
         ("{", "TARGET_PARSE"),
         (f"```json\n{EXAMPLE_ANSWER}\n```", "TARGET_PARSE"),
         (json.dumps(json.loads(EXAMPLE_ANSWER), ensure_ascii=False, indent=2), "NOT_CANONICAL"),
-        (EXAMPLE_ANSWER.replace('"value":27761', '"value":27761.0'), "NOT_CANONICAL"),
+        (EXAMPLE_ANSWER.replace('"value":12592', '"value":12592.0'), "NOT_CANONICAL"),
     ],
 )
 def test_bad_answer_is_reported(answer: str, code: str) -> None:

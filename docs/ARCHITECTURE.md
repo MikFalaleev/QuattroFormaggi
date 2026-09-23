@@ -50,7 +50,7 @@ src/qf/
 ├── domain/              # ДОМЕННАЯ ЛОГИКА (чистые функции; contracts + common)
 │   ├── units.py         #   to_kg, from_kg, правила округления
 │   ├── rules.py         #   compute_missing_fields, check_target_consistency, total_weight_kg
-│   ├── geo.py           #   20 городов, RU/EN названия, штаты
+│   ├── geo.py           #   20 российских городов: регионы, EN-названия, падежи, координаты
 │   ├── serialization.py #   serialize_target, parse_target, parse_target_lenient
 │   ├── tasks.py         #   TaskSpec, реестр задач TASKS (D-040) — шаг 4
 │   ├── record_checks.py #   check_record: проверки одной SFT-записи (коды шага 7) — шаг 4
@@ -303,4 +303,5 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - Версия `card_v1` экспортируется из `qf.contracts` как `CARD_SCHEMA_VERSION` (в модуле `card_v1.py` — `SCHEMA_VERSION`), чтобы будущая `card_v2` не конфликтовала по имени. В `SUPPORTED_SCHEMA_VERSIONS` добавлены `sft_dataset: {sft_record_v1}` и ключ `target: {card_v1}` — это не kind артефакта, а схемы ответа внутри записей (`SFTRecord.schema_version`, `TaskSpec.target_schema_version`).
 - Реестр задач `TASKS` не связан с портом (`port=None`): его записи — данные (`TaskSpec`), а не реализации. Он виден `all_registries()`, потому что `cli/wiring.py` импортирует `qf.domain`.
 - Проверки одной SFT-записи (`check_record`) вынесены в `qf/domain/record_checks.py` и возвращают `Issue` с кодами шага 7 (`UNKNOWN_TASK`, `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT`); `qf validate-data` (шаг 7) вызывает её и добавляет межзаписные проверки.
+- Города карточки — российские (D-047, D-048): `Place{city, region}`, справочник `qf.domain.CITIES`. Замена американских городов источника — данные конкретного датасета, поэтому она лежит не в `qf.domain`, а в `configs/data/city_map_ru_v1.yaml` и `qf.data.CityMap` (применяется при сборке фактов, шаг 5). Для другого источника данных (например, реальных российских заявок) таблица замены не нужна.
 - `qf.common.format_validation_error` стал публичным (раньше — приватная функция `config.py`): им же форматируются ошибки разбора ответа модели.

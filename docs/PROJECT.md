@@ -61,7 +61,9 @@ v0.1 намеренно остаётся одной задачей («запро
 
 **Сценарий:** запрос на перевозку (текст на русском или английском) → структурированная карточка груза (JSON, схема `card_v1`) + список недостающих полей + список конфликтов в исходных данных.
 
-Полная схема `card_v1`, правила единиц измерения, правило `missing_fields` и таблица городов фиксируются в `docs/DATA_SPEC.md` (создаётся на Шаге 4 `IMPLEMENTATION_PLAN.md`; на момент паспорта проекта файл ещё не существует). Контракт вывода модели кратко: `shipper_name, cargo_category, equipment_type, pieces, weight_total/weight_per_piece {value, unit}, origin{city,state}, destination{city,state}, pickup_date, delivery_date, temperature_c` + `missing_fields[]` + `conflicts[]`. Модель не пересчитывает единицы — это делает код (`qf.domain.to_kg`).
+Полная схема `card_v1`, правила единиц измерения, правило `missing_fields` и таблица городов фиксируются в `docs/DATA_SPEC.md` (создаётся на Шаге 4 `IMPLEMENTATION_PLAN.md`; на момент паспорта проекта файл ещё не существует). Контракт вывода модели кратко: `shipper_name, cargo_category, equipment_type, pieces, weight_total/weight_per_piece {value, unit}, origin{city,region}, destination{city,region}, pickup_date, delivery_date, temperature_c` + `missing_fields[]` + `conflicts[]`. Модель не пересчитывает единицы — это делает код (`qf.domain.to_kg`).
+
+**Города — российские** (указание пользователя 23.09.2026, D-047, D-048): в карточке русское название города и официальное название региона («Казань», «Республика Татарстан»). Американские города датасета при подготовке данных заменяются 20 российскими городами по фиксированной таблице с сохранением длин маршрутов; сам датасет не меняется. Вес в заявках — только килограммы и тонны (D-049).
 
 **Источник данных:** HF dataset `yogape/logistics-operations`, ревизия `54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07`, лицензия MIT. Датасет табличный (14 CSV), без естественного текста — обучающие пары синтезируются шаблонами (Шаг 6). Используются только `loads`, `routes`, `customers`, `delivery_events`; таблица `drivers` и площадки (`facilities`) исключены (см. `IMPLEMENTATION_PLAN.md`, B.1–B.2).
 

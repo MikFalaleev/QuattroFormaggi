@@ -56,17 +56,20 @@ def test_missing_key_rejected_even_if_null() -> None:
         parse_target(json.dumps(data, separators=(",", ":")))
 
 
-def test_state_regex() -> None:
-    assert Place(city="Houston", state="TX").state == "TX"
-    for state in ("tx", "TEX", "T1", ""):
-        with pytest.raises(ValidationError):
-            Place(city="Houston", state=state)
+def test_place_needs_city_and_region() -> None:
+    assert Place(city="Казань", region="Республика Татарстан").region == "Республика Татарстан"
+    with pytest.raises(ValidationError):
+        Place(city="Казань")  # type: ignore[call-arg]
+    with pytest.raises(ValidationError):
+        Place(city="Houston", state="TX")  # type: ignore[call-arg]
 
 
 def test_blank_strings_rejected() -> None:
-    for city in ("", "   "):
+    for blank in ("", "   "):
         with pytest.raises(ValidationError):
-            Place(city=city, state="TX")
+            Place(city=blank, region="Республика Татарстан")
+        with pytest.raises(ValidationError):
+            Place(city="Казань", region=blank)
     with pytest.raises(ValidationError):
         make_card(shipper_name=" ")
 
@@ -82,6 +85,7 @@ def test_serialize_is_canonical_and_cyrillic_not_escaped() -> None:
     assert serialize_target(make_target()) == EXAMPLE_ANSWER
     text = serialize_target(make_target(make_card(shipper_name="ООО «Ромашка»")))
     assert '"shipper_name":"ООО «Ромашка»"' in text
+    assert '"origin":{"city":"Пермь","region":"Пермский край"}' in text
     assert "\\u" not in text
 
 
@@ -90,7 +94,7 @@ def test_quantity_int_stays_int() -> None:
         target = make_target(make_card(weight_total=Quantity(value=value, unit="t")))
         return json.dumps(json.loads(serialize_target(target))["card"]["weight_total"])
 
-    assert Quantity(value=27761, unit="lb").value.__class__ is int
+    assert Quantity(value=12592, unit="kg").value.__class__ is int
     assert weight_text(27761) == '{"value": 27761, "unit": "t"}'
     assert weight_text(12.6) == '{"value": 12.6, "unit": "t"}'
     assert weight_text(13.0) == '{"value": 13, "unit": "t"}'

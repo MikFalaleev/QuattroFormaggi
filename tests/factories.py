@@ -19,9 +19,9 @@ from qf.domain import compute_missing_fields, serialize_target
 # The example answer of IMPLEMENTATION_PLAN.md B.3, in its canonical serialization.
 EXAMPLE_ANSWER = (
     '{"card":{"shipper_name":"National Retail","cargo_category":"retail",'
-    '"equipment_type":"dry_van","pieces":22,"weight_total":{"value":27761,"unit":"lb"},'
-    '"weight_per_piece":null,"origin":{"city":"Kansas City","state":"MO"},'
-    '"destination":{"city":"Indianapolis","state":"IN"},"pickup_date":"2022-01-01",'
+    '"equipment_type":"dry_van","pieces":22,"weight_total":{"value":12592,"unit":"kg"},'
+    '"weight_per_piece":null,"origin":{"city":"Пермь","region":"Пермский край"},'
+    '"destination":{"city":"Самара","region":"Самарская область"},"pickup_date":"2022-01-01",'
     '"delivery_date":"2022-01-02","temperature_c":null},"missing_fields":[],"conflicts":[]}'
 )
 
@@ -32,10 +32,10 @@ def make_card(**overrides: Any) -> ShipmentCard:
         "cargo_category": "retail",
         "equipment_type": "dry_van",
         "pieces": 22,
-        "weight_total": Quantity(value=27761, unit="lb"),
+        "weight_total": Quantity(value=12592, unit="kg"),
         "weight_per_piece": None,
-        "origin": Place(city="Kansas City", state="MO"),
-        "destination": Place(city="Indianapolis", state="IN"),
+        "origin": Place(city="Пермь", region="Пермский край"),
+        "destination": Place(city="Самара", region="Самарская область"),
         "pickup_date": date(2022, 1, 1),
         "delivery_date": date(2022, 1, 2),
         "temperature_c": None,
@@ -67,13 +67,13 @@ def make_record(answer: str | None = None, **overrides: Any) -> SFTRecord:
         "synthetic": True,
         "template_family": "T1",
         "variant": VariantInfo(
-            weight_unit="lb",
+            weight_unit="kg",
             weight_mode="total",
             dropped_fields=[],
             hard_cases=[],
             request_date=date(2021, 12, 28),
             date_style="iso",
-            city_lang="en",
+            city_lang="ru",
         ),
         "schema_version": "card_v1",
         "split": "train",

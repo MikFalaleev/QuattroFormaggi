@@ -129,7 +129,7 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
   - `weight_lbs`: 10 000–45 000, медиана 27 482.
   - `pieces`: 1–28.
   - `load_status` и `trip_status`: всегда `Completed`.
-- **Города.** 58 маршрутов (58 уникальных пар), 20 городов: Atlanta, Charlotte, Chicago, Columbus, Dallas, Denver, Detroit, Houston, Indianapolis, Kansas City, Las Vegas, Los Angeles, Memphis, Miami, Minneapolis, New York, Philadelphia, Phoenix, Portland, Seattle.
+- **Города.** 58 маршрутов (58 уникальных пар), 20 городов: Atlanta, Charlotte, Chicago, Columbus, Dallas, Denver, Detroit, Houston, Indianapolis, Kansas City, Las Vegas, Los Angeles, Memphis, Miami, Minneapolis, New York, Philadelphia, Phoenix, Portland, Seattle. **В карточке и заявках они заменяются российскими** (решение пользователя, D-047): сырые таблицы не меняются, на шаге 5 каждый город источника заменяется одним из 20 российских городов по фиксированной таблице `configs/data/city_map_ru_v1.yaml`, подобранной так, чтобы сохранились длины маршрутов (от них зависят сроки доставки).
 - **Даты:**
   - дата `Pickup.scheduled_datetime` **всегда равна** `load_date` (85 410 из 85 410);
   - `Delivery − Pickup` составляет 0–3 дня (0: 16 835; 1: 44 386; 2: 23 546; 3: 643).
@@ -141,13 +141,13 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
 |---|---|---|
 | 1. Извлечение массы, количества мест, маршрута, сроков | Да | Основная задача |
 | 2. Выявление недостающих данных | Да, через контролируемое удаление полей из текста | Основная задача |
-| 3. Нормализация единиц | Да (lbs / kg / t, даты, города RU↔EN) | Модель копирует значение и единицу, пересчёт делает код |
+| 3. Нормализация единиц | Да (kg / t, даты, города EN→RU) | Модель копирует значение и единицу, пересчёт делает код |
 | 4. Разделение данных документа и предположений | Частично: противоречия и отвлекающие числа | Hard cases |
 | 5. Ответы по фрагменту документа со ссылкой на ID | **Нет**: документов в датасете нет | **Не делать.** Корпус не выдумывать |
 | Габариты (длина × ширина × высота) | **Нет** в датасете | Поля в схеме нет. Не генерировать случайные габариты |
 | Температурный режим рефрижератора | **Нет** в датасете | Поле есть, но всегда `null`. Для `reefer` оно всегда попадает в `missing_fields` |
 
-Датасет американский: мили, фунты, города США. Метрическую нормализацию и русские тексты обеспечивает генератор. Модель, обученная только на этих данных, не проверена на реальных российских заявках. Это ограничение записывается в модельную карточку.
+Датасет американский: мили, фунты, города США. Российские города (D-047), килограммы и тонны (D-049) и русские тексты обеспечивают таблица замены городов и генератор; даты и сроки остаются американскими. Модель, обученная только на этих данных, не проверена на реальных российских заявках. Это ограничение записывается в модельную карточку.
 
 ### B.3. Контракт вывода модели (фиксируется в `docs/DATA_SPEC.md`, версия схемы `card_v1`)
 
@@ -160,10 +160,10 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
     "cargo_category": "retail",
     "equipment_type": "dry_van",
     "pieces": 22,
-    "weight_total": {"value": 27761, "unit": "lb"},
+    "weight_total": {"value": 12592, "unit": "kg"},
     "weight_per_piece": null,
-    "origin": {"city": "Kansas City", "state": "MO"},
-    "destination": {"city": "Indianapolis", "state": "IN"},
+    "origin": {"city": "Пермь", "region": "Пермский край"},
+    "destination": {"city": "Самара", "region": "Самарская область"},
     "pickup_date": "2022-01-01",
     "delivery_date": "2022-01-02",
     "temperature_c": null
@@ -179,7 +179,7 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
 - **`equipment_type`:** `dry_van` | `reefer` | `null`. `Dry Van → dry_van`, `Refrigerated → reefer`.
 - **`cargo_category`:** `general` | `retail` | `consumer_goods` | `food_beverage` | `automotive` | `electronics` | `null`. Берётся из `customers.primary_freight_type`. Это **прокси**-атрибут клиента, а не груза, и в DATA_SPEC это прямо указано.
 - **`weight_total` и `weight_per_piece` хранят величину в том виде, как она записана в тексте:** `{"value": number, "unit": "kg"|"t"|"lb"}`. **Модель не пересчитывает единицы.** Пересчёт в кг делает функция `qf.domain.to_kg()` с точным коэффициентом `1 lb = 0.45359237 kg` и `1 t = 1000 kg`. Правило округления для вывода: `round(kg, 1)`. Так выполняется требование §6 плана разработки: массу и стоимость по формулам считает детерминированный код.
-- **Города:** каноническое английское имя из `routes` и двухбуквенный код штата, даже если в тексте город написан по-русски («Хьюстон, Техас» → `{"city":"Houston","state":"TX"}`).
+- **Города:** каноническое русское название и официальное название региона (субъекта РФ) из справочника `qf.domain.CITIES`, даже если в тексте город написан по-английски или без региона («Kazan» → `{"city":"Казань","region":"Республика Татарстан"}`). Регион модель выдаёт всегда (D-047, D-048).
 - **Даты:** ISO `YYYY-MM-DD`. Относительные даты («завтра») вычисляются от «даты запроса», которая всегда указана в первой строке сообщения пользователя.
 - **`temperature_c`:** в `card_v1` всегда `null` (в источнике нет данных).
 - **`missing_fields` вычисляет только функция `qf.domain.compute_missing_fields(card)`,** никогда LLM или человек. Порядок элементов фиксированный: `REQUIRED_ORDER`. Правило:
@@ -260,7 +260,7 @@ src/qf/
 ├── domain/              # ДОМЕННАЯ ЛОГИКА (чистые функции; contracts + common)
 │   ├── units.py         #   to_kg, from_kg, правила округления
 │   ├── rules.py         #   compute_missing_fields, check_target_consistency, total_weight_kg
-│   ├── geo.py           #   20 городов, RU/EN названия, штаты
+│   ├── geo.py           #   20 российских городов: регионы, EN-названия, падежи, координаты
 │   ├── serialization.py #   serialize_target, parse_target, parse_target_lenient
 │   ├── prompting.py     #   load_system_prompt, build_messages (единые для data/training/runtime)
 │   ├── prompts/         #   system_extract_v1.txt (package data)
@@ -827,7 +827,7 @@ WeightUnit = Literal["kg", "t", "lb"]
 
 class Quantity(BaseModel):  value: int | float (>0, конечное); unit: WeightUnit
                             # smart union: 27761 остаётся int и сериализуется как 27761, а не 27761.0
-class Place(BaseModel):     city: str (непустая); state: str (regex ^[A-Z]{2}$)
+class Place(BaseModel):     city: str (непустая); region: str (непустая)   # D-048: было state (код штата США)
 class ShipmentCard(BaseModel):
     shipper_name: str | None
     cargo_category: CargoCategory | None
@@ -888,14 +888,9 @@ class SFTRecord(BaseModel):
 
 **`qf/domain/geo.py`:**
 
-- `CITIES: dict[str, CityInfo]` — 20 городов из B.1. Для каждого города:
-  - `state`;
-  - `state_name_en`;
-  - `name_ru` — ручной перевод, например `"Kansas City": "Канзас-Сити"`, `"New York": "Нью-Йорк"`, `"Portland": "Портленд"`, `"Las Vegas": "Лас-Вегас"`;
-  - `state_name_ru` («Техас», «Миссури», …).
-
-  Агент заполняет таблицу вручную, а человек проверяет её в отчёте шага.
-- `canonical_place(city_en: str, state: str) -> Place` — `KeyError` для неизвестного города.
+- **Реализовано иначе (D-047, D-048):** `CITIES: Mapping[str, CityInfo]` — 20 **российских** городов (ключ — каноническое русское название). Для каждого: `region` (официальное название субъекта РФ), `name_en`, `region_en`, `genitive` («из Казани»), `accusative` («в Казань»), `lat`, `lon`. Названия и координаты — из Википедии, регионы сверены с Wikidata; человек проверяет таблицу в отчёте шага.
+- `canonical_place(city: str) -> Place` — `KeyError` для неизвестного города.
+- Замена американских городов источника — данные, а не доменная логика: `configs/data/city_map_ru_v1.yaml` + `qf.data.CityMap` (`load_city_map`, `CityMap.place(source_city) -> Place`), тесты `tests/test_city_map.py` (взаимная однозначность, все маршруты, сохранение длин маршрутов).
 
 **Тесты:**
 
@@ -915,15 +910,15 @@ class SFTRecord(BaseModel):
   - `test_conflict_field_must_be_null`.
 - `test_schema.py`:
   - `test_extra_key_rejected`;
-  - `test_state_regex`;
+  - `test_place_needs_city_and_region` (было `test_state_regex`, D-048);
   - `test_serialize_parse_roundtrip`;
   - `test_serialize_is_canonical_and_cyrillic_not_escaped`;
   - `test_quantity_int_stays_int` — `Quantity(value=27761, unit="lb")` сериализуется как `27761`, `12.6` — как `12.6`, `13.0` — как `13`;
   - `test_parse_rejects_code_fence`;
   - `test_fieldname_literal_matches_card_fields` — множество `FieldName` равно `ShipmentCard.model_fields`.
 - `test_geo.py`:
-  - `test_all_route_cities_present` — на фикстуре и, если данные есть, на реальных `routes`;
-  - `test_ru_names_unique`.
+  - справочник: 20 городов, уникальные названия, официальные названия регионов, падежи, координаты, таблица в DATA_SPEC совпадает с кодом;
+  - `test_city_map.py`: все города источника (фикстура и реальные `routes`) заменяются, замена взаимно однозначна, длины маршрутов сохраняются (корреляция > 0,9).
 
 **Критерии приёмки:**
 
@@ -945,9 +940,9 @@ class SFTRecord(BaseModel):
 
 - `@dataclass(frozen=True) class LoadFacts`: поля `load_id, route_id, customer_id, shipper_name, cargo_category: CargoCategory, equipment_type: EquipmentType, pieces: int, weight_lbs: int, origin: Place, destination: Place, pickup_date: date, delivery_date: date, load_month: str`.
 - **Намеренно нет** `revenue`, `fuel_surcharge`, `accessorial_charges`, `booking_type`, `distance`, `rate`: этих полей нет в `card_v1`, и они не должны попасть в gold.
-- `build_load_facts(t: RawTables) -> list[LoadFacts]`:
+- `build_load_facts(t: RawTables, city_map: CityMap) -> list[LoadFacts]`:
   - join `loads` ↔ `routes` ↔ `customers` ↔ `delivery_events` (pivot по `event_type`);
-  - маршрут берётся из `routes`, даты — из `scheduled_datetime` (только дата);
+  - маршрут берётся из `routes` и сразу заменяется российскими городами: `origin = city_map.place(routes.origin_city)`, то же для `destination` (`qf.data.CityMap`, `configs/data/city_map_ru_v1.yaml`, D-047); sha256 файла замены пишется в `run_manifest.json`; даты — из `scheduled_datetime` (только дата);
   - маппинги `Dry Van→dry_van`, `Refrigerated→reefer`, `Food/Beverage→food_beverage`, `Consumer Goods→consumer_goods` и т. д. задаются явными словарями. Неизвестное значение → исключение;
   - порядок результата — сортировка по `load_id`.
 - `save_facts(facts, path: Path) -> ArtifactRef` / `load_facts(ref: ArtifactRef) -> list[LoadFacts]` — JSONL в `data/processed/load_facts.jsonl`, артефакт `load_facts@load_facts_v1` с родителем `raw_dataset` (C.6).
@@ -955,7 +950,7 @@ class SFTRecord(BaseModel):
 
 **Тесты:**
 
-- `test_facts_from_fixture` — количество равно числу загрузок, все поля заполнены;
+- `test_facts_from_fixture` — количество равно числу загрузок, все поля заполнены, `origin`/`destination` — российские города из `CITIES` (ни одного города США);
 - `test_facts_have_no_financial_fields` — у dataclass нет полей с подстроками `revenue|surcharge|rate|distance|charge`;
 - `test_mapping_unknown_value_raises`;
 - `test_facts_sorted_and_deterministic` — два вызова дают идентичный JSONL (равный sha256);
@@ -996,7 +991,7 @@ tests/test_generate_determinism.py
 - «верни только JSON по схеме, без markdown»;
 - компактное описание всех ключей `card` и допустимых значений;
 - «массу записывай значением и единицей как в тексте, не пересчитывай»;
-- «города — английское название и код штата США»;
+- «города — русское название и регион из справочника (для 20 городов регион однозначен), даже если в заявке город написан по-английски»;
 - «относительные даты считай от даты запроса»;
 - «неизвестное — null»;
 - «при двух разных значениях одного поля поставь null и добавь в conflicts»;
@@ -1025,19 +1020,18 @@ class RenderedRequest(BaseModel):  # frozen, extra="forbid"
     variant: VariantInfo
 ```
 
-**Инвариант E1.** Для каждого не-null поля `target.card` есть хотя бы одна evidence-строка, и каждая evidence-строка — подстрока `text`. Для каждого поля, у которого evidence нет, значение в card — `null`. Gold строится **из evidence-значений**, а не напрямую из LoadFacts. Например, если вес отрендерен как «12,6 т», то gold — `{"value":12.6,"unit":"t"}`.
+**Инвариант E1.** Для каждого не-null поля `target.card` есть хотя бы одна evidence-строка, и каждая evidence-строка — подстрока `text`. Для каждого поля, у которого evidence нет, значение в card — `null`. Gold строится **из evidence-значений**, а не напрямую из LoadFacts. Например, если вес отрендерен как «12,6 т», то gold — `{"value":12.6,"unit":"t"}`. Исключение (D-048): для `origin`/`destination` evidence — упоминание города; регион в gold берётся из `CITIES` и в тексте может отсутствовать.
 
 **6.4. Рендер полей (`render/fields.py`)** — у каждой функции есть параметр `rng: random.Random`:
 
-- **`render_weight(lbs, lang, unit, rng)`.** Форматы:
-  - `27761 lbs`, `27,761 lb`, `27 761 фунтов`;
+- **`render_weight(lbs, lang, unit, rng)`.** Единицы — **только `kg` и `t`** (D-049): вес источника в фунтах пересчитывается `render_value_from_lbs`. Форматы:
   - `12592 кг`, `12 592 kg`;
   - `12.6 t`, `12,6 т`, `12,6 тонны`.
 
   RU использует десятичную запятую и неразрывный или обычный пробел для тысяч. EN — десятичную точку и запятую для тысяч. Gold `Quantity.value` — число (float/int) из текста.
-- **`render_per_piece_weight(lbs, pieces, lang, unit, rng)`:** «22 паллеты по 572 кг», «22 pallets, 1,262 lb each». Значение — `round(to_kg(lbs)/pieces)` в выбранной единице. Gold `weight_per_piece` + `pieces`, а `weight_total = null`.
+- **`render_per_piece_weight(lbs, pieces, lang, unit, rng)`:** «22 паллеты по 572 кг», «22 pallets, 572 kg each». Значение — `round(to_kg(lbs)/pieces)` в выбранной единице. Gold `weight_per_piece` + `pieces`, а `weight_total = null`.
 - **`render_pieces(n, lang, rng)`:** «22 места», «22 паллеты», «22 pcs», «22 pallets», «22 грузоместа». Слова «паллета», «место», «коробка» и т. п. — синонимы количества мест.
-- **`render_place(place, lang, city_lang, rng)`:** «Kansas City, MO», «Канзас-Сити (Миссури)», «Канзас-Сити, MO», «Kansas City, Missouri».
+- **`render_place(place, lang, city_lang, rng)`:** «Казань», «г. Казань», «Казань (Республика Татарстан)», «из Казани в Самару» (падежи — `CityInfo.genitive`/`accusative`), «Kazan», «Kazan, Tatarstan». Gold — всегда `canonical_place(city)` с регионом, даже если в тексте региона нет (D-048).
 - **`render_date(d, request_date, lang, style, rng)`:**
   - `iso`: 2022-01-01;
   - `text`: «1 января 2022», «January 1, 2022», «01.01.2022», «1/1/2022» (EN — только формат месяц/день, это прописать в DATA_SPEC);
@@ -1055,31 +1049,32 @@ class RenderedRequest(BaseModel):  # frozen, extra="forbid"
 | T4 | EN | Formal email | train/val/test |
 | T5 | EN | Short chat message | train/val/test |
 | T6 | EN | Key: value form | train/val/test |
-| **T7** | RU | Смешанный RU/EN, сленг («нужен реф Chicago → Даллас, 12,6 т, 18 палл.») | **только test_ood/bench** |
+| **T7** | RU | Смешанный RU/EN, сленг («нужен реф Kazan → Самара, 12,6 т, 18 палл.») | **только test_ood/bench** |
 | **T8** | EN | Длинное письмо с отвлекающими числами и пересказом переписки | **только test_ood/bench** |
 
-**6.6. Варианты и трудные случаи (`hard_cases.py`).** Каждый вид — реализация порта `HardCase`, регистрируется в `HARD_CASES`; генератор выбирает их по именам из конфига. Реализации v0.1 (имена в реестре): `dropped_fields`, `per_piece_weight`, `conflict_weight`, `conflict_pieces`, `relative_date`, `distractor_numbers`, `ru_city_names`. Типы `RequestDraft`, `RenderedField`, `RenderedRequest` объявить в `qf/contracts/rendering.py`, порты `TemplateFamily` и `HardCase` — в `ports.py` в этом шаге.
+**6.6. Варианты и трудные случаи (`hard_cases.py`).** Каждый вид — реализация порта `HardCase`, регистрируется в `HARD_CASES`; генератор выбирает их по именам из конфига. Реализации v0.1 (имена в реестре): `dropped_fields`, `per_piece_weight`, `conflict_weight`, `conflict_pieces`, `relative_date`, `distractor_numbers`, `city_lang_switch`. Типы `RequestDraft`, `RenderedField`, `RenderedRequest` объявить в `qf/contracts/rendering.py`, порты `TemplateFamily` и `HardCase` — в `ports.py` в этом шаге.
 
 - **`dropped_fields`:** случайно исключить из текста 1–3 поля из `{origin, destination, pickup_date, equipment_type, pieces, weight_total, delivery_date, shipper_name, cargo_category}`. Эти поля → `null`, а `missing_fields` пересчитывается правилом.
 - **`conflict_weight`:** в тексте два значения веса, второе равно первому × U(0,8…1,2), округлённому по правилам единицы («…вес 12,6 т. Уточнение: по накладной 14,1 т»). Card: `weight_total = null`, `conflicts = [{"field":"weight_total","values":[{…},{…}]}]`, `weight_total` в `missing_fields`.
 - **`conflict_pieces`:** то же для `pieces`, второе значение — `pieces ± U{1..3}`, но не меньше 1.
 - **Для обоих конфликтов:** после округления и рендера два значения обязаны различаться **и как строки в тексте, и как разобранные числа**. Для веса сравнивать через `to_kg`, разница должна быть больше допуска метрики 0,5 кг. Если совпали (например, оба «12,6 т» или `pieces=1` и сдвиг вниз), пересэмплировать сдвиг; после 10 неудачных попыток выбрать другой hard case для этой записи.
 - **`distractor_numbers`:** добавить числа, которых нет в схеме:
-  - ставка ($ из `revenue`, **только как отвлекающий текст**);
+  - ставка (число из `revenue`, в тексте — условная сумма в рублях, **только как отвлекающий текст**);
   - номер дока;
-  - номер заявки;
-  - расстояние в милях.
+  - номер заявки.
+
+  Расстояние в тексте **не** пишется: реального расстояния между российскими городами в данных нет (D-047).
 
   Ни одно из них не должно попасть в card. Номера телефонов и имена людей не генерировать.
 - **`relative_date`:** см. 6.4.
-- **`ru_city_names`:** город в тексте по-русски.
+- **`city_lang_switch`:** город в тексте на другом языке, чем заявка: латиницей в русской (`Kazan`) или кириллицей в английской (было `ru_city_names`, D-047). Gold — канонический русский город с регионом.
 
 **6.7. Конфиг `configs/data/generate_v1.yaml`:**
 
 ```yaml
 seed: 42
 schema_version: card_v1
-system_prompt_version: v1
+system_prompt_version: system_extract_v1
 language_share: {ru: 0.6, en: 0.4}
 variants_per_load: 1
 pool:                                  # сколько загрузок отобрать (стратифицированно)
@@ -1092,9 +1087,9 @@ mix:                                   # доли внутри каждого с
   clean: 0.55
   dropped_fields: 0.25
   hard: 0.20                           # равномерно по per_piece, conflict_*, relative_date, distractor_numbers
-weight_unit_share: {lb: 0.4, kg: 0.35, t: 0.25}
+weight_unit_share: {kg: 0.6, t: 0.4}               # фунтов нет (D-049)
 families: [T1, T2, T3, T4, T5, T6, T7, T8]   # имена из TEMPLATE_FAMILIES
-hard_cases: [dropped_fields, per_piece_weight, conflict_weight, conflict_pieces, relative_date, distractor_numbers, ru_city_names]
+hard_cases: [dropped_fields, per_piece_weight, conflict_weight, conflict_pieces, relative_date, distractor_numbers, city_lang_switch]
 ood:
   holdout_route_count: 6               # маршруты только в test_ood/bench
   holdout_families: [T7, T8]
@@ -1327,7 +1322,7 @@ CLI: `qf bench export-review`, `qf bench import-review --csv …`, `qf bench fre
   - если даже мягкий разбор не удался — все поля кейса считаются неверными.
 - **Нормализация при сравнении полей:**
   - `weight_*` — сравнивать `to_kg()` с допуском `abs ≤ 0.5 kg`. Единицу отдельно не сравнивать: 12,6 т и 12 600 кг эквивалентны. Значение из другой единицы, чем в тексте, — не ошибка, если кг совпадают;
-  - `origin`/`destination` — `city` (casefold, trim) и `state` точно;
+  - `origin`/`destination` — `city` и `region` (casefold, trim) точно;
   - даты — точно;
   - enum — точно;
   - `pieces` — точно;

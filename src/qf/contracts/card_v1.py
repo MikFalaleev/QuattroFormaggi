@@ -64,10 +64,13 @@ class Quantity(ContractModel):
 
 
 class Place(ContractModel):
-    """Canonical English city name and two-letter US state code, e.g. Houston, TX."""
+    """Canonical Russian city and region names, e.g. Казань, Республика Татарстан (D-048).
+
+    For a federal city the region equals the city (Москва, Москва).
+    """
 
     city: NonEmptyStr
-    state: str = Field(pattern=r"^[A-Z]{2}$")
+    region: NonEmptyStr
 
 
 class ShipmentCard(ContractModel):

@@ -1,0 +1,28 @@
+# Source (US) city of routes.csv -> Russian city of the card (docs/DECISIONS.md D-047).
+# The raw dataset is not changed: step 5 applies this map when it builds LoadFacts.
+# Chosen so that Russian route lengths follow the US road distances (and so the transit days
+# of the source stay plausible): all 16 Russian cities with 1M+ people plus Тула, Томск,
+# Кемерово, Барнаул; great-circle x 1.2 vs US road km over the 58 routes: correlation 0.94,
+# median deviation 16%. A new map is a new file (city_map_ru_v2.yaml); this one is not edited.
+version: city_map_ru_v1
+cities:
+  Atlanta: Воронеж
+  Charlotte: Ростов-на-Дону
+  Chicago: Казань
+  Columbus: Волгоград
+  Dallas: Екатеринбург
+  Denver: Омск
+  Detroit: Уфа
+  Houston: Санкт-Петербург
+  Indianapolis: Самара
+  Kansas City: Пермь
+  Las Vegas: Кемерово
+  Los Angeles: Красноярск
+  Memphis: Нижний Новгород
+  Miami: Краснодар
+  Minneapolis: Челябинск
+  New York: Тула
+  Philadelphia: Москва
+  Phoenix: Томск
+  Portland: Барнаул
+  Seattle: Новосибирск

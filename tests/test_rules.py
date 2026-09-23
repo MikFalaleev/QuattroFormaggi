@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from qf.contracts import Conflict, Quantity, ShipmentCard
 from qf.domain import (
     REQUIRED_ORDER,
@@ -56,7 +54,7 @@ def test_missing_order_is_canonical() -> None:
 
 
 def test_total_weight_kg() -> None:
-    assert total_weight_kg(make_card()) == pytest.approx(12592.18778357)
+    assert total_weight_kg(make_card()) == 12592.0
     per_piece = make_card(weight_total=None, weight_per_piece=Quantity(value=572, unit="kg"))
     assert total_weight_kg(per_piece) == 572 * 22
     assert total_weight_kg(per_piece.model_copy(update={"pieces": None})) is None

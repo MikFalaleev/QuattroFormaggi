@@ -3,6 +3,7 @@
 Other packages import from here, never from submodules.
 """
 
+from qf.data.city_map import CityMap, load_city_map
 from qf.data.fetch import (
     PROVENANCE_FILENAME,
     RAW_SCHEMA_VERSION,
@@ -39,6 +40,7 @@ __all__ = [
     "RAW_SCHEMA_VERSION",
     "RAW_SOURCES",
     "CheckResult",
+    "CityMap",
     "Expectations",
     "FetchResult",
     "FileRecord",
@@ -50,6 +52,7 @@ __all__ = [
     "SourceConfig",
     "SourceFileConfig",
     "fetch_raw_dataset",
+    "load_city_map",
     "load_raw_tables",
     "profile_raw_dataset",
     "profile_tables",
