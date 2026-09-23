@@ -43,7 +43,13 @@ _SPECS = (
     CommandSpec(
         "data fetch", "2", "download the pinned raw dataset", data.run_fetch, data.configure_fetch
     ),
-    CommandSpec("data profile", "3", "check raw table integrity"),
+    CommandSpec(
+        "data profile",
+        "3",
+        "check raw table integrity",
+        data.run_profile,
+        data.configure_profile,
+    ),
     CommandSpec("data build", "5-6", "build load facts and generate SFT records"),
     CommandSpec("data split", "7", "assign or check splits"),
     CommandSpec("data report", "7", "dataset length and composition report"),

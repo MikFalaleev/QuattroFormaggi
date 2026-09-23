@@ -12,6 +12,7 @@ __all__ = ["SUPPORTED_SCHEMA_VERSIONS", "require_supported", "supported_versions
 
 SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "raw_dataset": frozenset({"logistics_ops_csv_v1"}),  # step 2
+    "metrics": frozenset({"profile_report_v1"}),  # step 3
 }
 
 

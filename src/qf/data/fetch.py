@@ -11,7 +11,6 @@ from __future__ import annotations
 import contextlib
 import shutil
 import tempfile
-import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -24,22 +23,17 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from qf.common import (
     DATA_RAW,
     IGNORED_FILE_NAMES,
-    RUNS,
     ArtifactRef,
     ComponentConfig,
     QFError,
-    RunManifest,
     StrictConfig,
     artifact_sha256,
     atomic_write_text,
-    collect_git_info,
-    collect_package_versions,
     load_artifact_manifest,
-    new_run_id,
     project_root,
     sha256_file,
+    start_run,
     write_artifact,
-    write_manifest,
 )
 from qf.contracts import RawSource
 from qf.data.registries import RAW_SOURCES
@@ -54,6 +48,7 @@ __all__ = [
     "SourceConfig",
     "SourceFileConfig",
     "fetch_raw_dataset",
+    "raw_dataset_path",
     "read_provenance",
     "verify_provenance",
     "verify_raw_dataset",
@@ -306,13 +301,18 @@ class FetchResult:
     run_dir: Path | None
 
 
+def raw_dataset_path(source: RawSource, root: Path) -> Path:
+    """Where `source` keeps its raw dataset inside the project (under data/raw/)."""
+    return source.target(root / DATA_RAW)
+
+
 def _existing_ref(target: Path, root: Path) -> ArtifactRef:
     return load_artifact_manifest(target, root=root).ref
 
 
 def verify_raw_dataset(source: RawSource, *, root: Path) -> tuple[ArtifactRef, list[str]]:
     """Check an already fetched raw dataset against its manifest, provenance and config."""
-    target = source.target(root / DATA_RAW)
+    target = raw_dataset_path(source, root)
     if not target.exists():
         relative = target.relative_to(root)
         raise QFError(f"{relative} does not exist: run `qf data fetch` first")
@@ -328,30 +328,18 @@ def fetch_raw_dataset(
     A present but modified dataset is an error: it is never silently re-downloaded.
     A run manifest is written only when a download actually produced a new artifact.
     """
-    target = source.target(root / DATA_RAW)
+    target = raw_dataset_path(source, root)
     if target.exists():
         ref, problems = verify_raw_dataset(source, root=root)
         if problems:
             listing = "\n".join(f"  - {problem}" for problem in problems)
             raise QFError(f"{ref.path} does not match its provenance:\n{listing}")
         return FetchResult(ref=ref, downloaded=False, run_dir=None)
-    run_id = new_run_id(_RUN_KIND)
-    started = time.monotonic()
-    created_at = datetime.now(UTC)
-    ref = source.fetch(root / DATA_RAW, run_id)
-    git_commit, git_dirty = collect_git_info(root)
-    manifest = RunManifest(
-        run_id=run_id,
-        kind=_RUN_KIND,
-        created_at=created_at,
-        status="completed",
-        git_commit=git_commit,
-        git_dirty=git_dirty,
-        package_versions=collect_package_versions(["quattro-formaggi", "huggingface_hub"]),
-        data_hashes={str(ref.path): ref.sha256},
+    run = start_run(_RUN_KIND, root)
+    ref = source.fetch(root / DATA_RAW, run.run_id)
+    run.finish(
+        packages=["huggingface_hub"],
+        data_hashes={ref.path.as_posix(): ref.sha256},
         config=dict(source_config),
-        wall_time_s=round(time.monotonic() - started, 3),
     )
-    run_dir = root / RUNS / run_id
-    write_manifest(manifest, run_dir)
-    return FetchResult(ref=ref, downloaded=True, run_dir=run_dir)
+    return FetchResult(ref=ref, downloaded=True, run_dir=run.run_dir)

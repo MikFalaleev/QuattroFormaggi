@@ -1,0 +1,4 @@
+route_id,origin_city,origin_state,destination_city,destination_state,typical_distance_miles,base_rate_per_mile,fuel_surcharge_rate,typical_transit_days
+RTE00001,Atlanta,GA,Chicago,IL,677,1.7,0.19,1
+RTE00002,Houston,TX,Detroit,MI,1271,2.33,0.32,2
+RTE00003,Chicago,IL,Los Angeles,CA,2003,2.55,0.29,3

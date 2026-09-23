@@ -16,6 +16,7 @@ from qf.common import (
     collect_package_versions,
     new_run_id,
     read_manifest,
+    start_run,
     update_manifest,
     write_manifest,
 )
@@ -117,3 +118,23 @@ def test_collect_package_versions() -> None:
     versions = collect_package_versions(["pydantic", "definitely-not-installed-qf-xyz"])
     assert versions["pydantic"] is not None
     assert versions["definitely-not-installed-qf-xyz"] is None
+
+
+def test_run_recorder_writes_complete_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    run = start_run("profile", tmp_path)
+    assert re.fullmatch(r"\d{8}-\d{6}-profile-[0-9a-f]{6}", run.run_id)
+    assert run.run_dir == tmp_path / "runs" / run.run_id
+    manifest = run.finish(packages=["pydantic"], metrics={"ok": True}, seed=42)
+    assert read_manifest(run.run_dir) == manifest
+    assert (manifest.kind, manifest.status, manifest.seed) == ("profile", "completed", 42)
+    assert set(manifest.package_versions) == {"quattro-formaggi", "pydantic"}
+    assert manifest.git_commit is None  # tmp_path is not a repository
+    assert manifest.wall_time_s is not None and manifest.wall_time_s >= 0
+
+
+def test_run_recorder_rejects_unknown_fields(tmp_path: Path) -> None:
+    with pytest.raises(QFError, match="invalid manifest for run"):
+        start_run("profile", tmp_path).finish(not_a_field=1)

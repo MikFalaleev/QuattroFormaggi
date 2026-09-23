@@ -7,7 +7,7 @@ import pytest
 
 from tests.conftest import REPO_ROOT
 
-TRACKED_SUFFIXES = {".py", ".yaml", ".yml", ".txt", ".toml", ".md", ".gitkeep"}
+TRACKED_SUFFIXES = {".py", ".yaml", ".yml", ".txt", ".toml", ".md", ".csv", ".gitkeep"}
 TRACKED_DIRS = ("src", "tests", "configs", "docs")
 
 
@@ -29,6 +29,7 @@ def test_no_source_file_is_git_ignored() -> None:
     """Regression: an unanchored `data/` pattern once hid the package src/qf/data/ from git."""
     files = _repository_files()
     assert "src/qf/data/__init__.py" in files
+    assert "tests/fixtures/raw_mini/loads.csv" in files
     result = subprocess.run(
         ["git", "check-ignore", "--no-index", "--stdin"],
         cwd=REPO_ROOT,

@@ -5,7 +5,7 @@
 - **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: запрос на перевозку → JSON-карточка груза (`card_v1`) + список недостающих полей; экспорт в GGUF для LM Studio.
 - **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля.
 
-Статус: реализованы **шаги 1–2** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance). Обучения и весов пока нет.
+Статус: реализованы **шаги 1–3** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц). Обучения и весов пока нет.
 
 Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `AGENTS.md` (правила для coding agents).
 
@@ -19,6 +19,7 @@ uv run qf --version
 uv run qf doctor           # read-only отчёт об окружении → runs/doctor/hardware.json
 uv run qf data fetch       # скачать закреплённую ревизию датасета (~31 MB) → data/raw/
 uv run qf data fetch --verify-only   # проверить скачанные файлы по provenance.json
+uv run qf data profile     # 10 проверок целостности → data/processed/profile_report.{json,md}
 ```
 
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); QLoRA-обучение — удалённая машина Linux + NVIDIA (≥24 GB VRAM). См. `docs/PROJECT.md`, раздел 4.
@@ -29,8 +30,8 @@ uv run qf data fetch --verify-only   # проверить скачанные ф�
 |---|---|---|
 | `qf doctor [--out PATH]` | 1 | реализована |
 | `qf data fetch [--config PATH] [--verify-only]` | 2 | реализована |
-| `qf data profile` | 3 | не реализована (код выхода 2) |
-| `qf data build` | 5–6 | не реализована |
+| `qf data profile [--source-config PATH] [--expectations PATH]` | 3 | реализована |
+| `qf data build` | 5–6 | не реализована (код выхода 2) |
 | `qf data split`, `qf data report`, `qf validate-data` | 7 | не реализованы |
 | `qf bench export-review / import-review / freeze / verify` | 8 | не реализованы |
 | `qf eval run`, `qf eval compare` | 9 | не реализованы |

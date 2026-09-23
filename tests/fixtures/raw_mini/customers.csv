@@ -1,0 +1,4 @@
+customer_id,customer_name,customer_type,credit_terms_days,primary_freight_type,account_status,contract_start_date,annual_revenue_potential
+CUST00001,Metro Wholesale,Dedicated,60,General,Active,2020-02-20,985117
+CUST00002,National Retail,Contract,30,Retail,Active,2021-06-02,4936566
+CUST00003,American Corp,Contract,15,Food/Beverage,Inactive,2020-11-29,3948027

@@ -46,6 +46,17 @@
 | D-028 | Шаблоны `/data/`, `/artifacts/`, `/runs/` в `.gitignore` привязаны к корню; тест `tests/architecture/test_repository_files_tracked.py` проверяет, что ни один файл из `src/`, `tests/`, `configs/`, `docs/` не игнорируется | Ошибка шага 1: непривязанный `data/` скрывал пакет `src/qf/data/` и `configs/data/` — в коммит `407732e` не попал `src/qf/data/__init__.py`, свежий клон был неработоспособен. Исправлено коммитом шага 2 |
 | D-029 | Логгеры `httpx`, `httpcore`, `huggingface_hub` работают на уровне WARNING, если общий уровень не DEBUG | При INFO `httpx` печатает каждый HTTP-запрос загрузки — шум в выводе `qf data fetch` |
 
+## Решения шага 3 (23.09.2026)
+
+| ID | Решение | Причина |
+|---|---|---|
+| D-030 | `weight_lbs`, `pieces` и другие количества читаются как nullable `Int64`, а не `int64` | С `int64` пропуск в CSV обрушил бы загрузчик; с `Int64` его сообщает проверка `null_rates` с долей пропусков. Нечисловое значение — `DataValidationError` с кодом `DTYPE` |
+| D-031 | Проверки сверх списка шага 3: `row_counts` (объёмы из B.1), `delivery_events.load_id ⊆ loads`, неизвестный `event_type`, загрузки без событий; набор колонок сравнивается как множество | Эти факты B.1 иначе не подтверждались бы автоматически; порядок колонок в CSV смыслового значения не имеет |
+| D-032 | `profile_report.json` — артефакт kind `metrics`, версия `profile_report_v1`, родитель — sha сырого датасета; Markdown — производный файл без манифеста. Отчёт пишется и при проваленных проверках; `run_manifest.status = completed`, а итог — в `metrics.all_checks_passed`; CLI возвращает код 1 | Отчёт нужен именно тогда, когда что-то не так; статус `failed` зарезервирован за сбоем самого запуска |
+| D-033 | Проверки маршрута, даты забора и срока доставки сравнивают только загрузки с ровно одним Pickup и одним Delivery; остальные уже сообщены `event_pairs` | Иначе одна ошибка структуры событий дублировалась бы в трёх проверках или ломала бы разворот таблицы |
+| D-034 | Общий учёт запуска вынесен в `qf.common.start_run(kind, root) -> RunRecorder` с `finish(...)`; `fetch` и `profile` используют его | Чек-лист A.4: код сборки `run_manifest.json` повторялся в двух стадиях |
+| D-035 | `qf data profile` находит сырой датасет через тот же конфиг источника (`raw_dataset_path(source, root)`), что и `qf data fetch` | Ревизия датасета задаётся в одном месте — `configs/data/source.yaml` |
+
 ### Файлы и зависимости сверх списков шагов
 
 - `src/qf/common/_optional.py` — приватный модуль с `is_installed`/`import_optional` (общий для `doctor.py` и `seed.py`, D-013).
@@ -54,6 +65,7 @@
 - `ComponentConfig` (`qf/common/config.py`) и `build()` (`qf/cli/wiring.py`) — механизм выбора реализации из C.5, реализован заранее вместе с реестром.
 - Зависимости: `numpy` добавлен в core явно (используется `seed.py`; раньше приходил только транзитивно через pandas); `types-psutil` — в `dev` для строгого mypy.
 - Шаг 2: `src/qf/data/registries.py` (реестры стадий данных), `src/qf/cli/commands/data.py` (обработчики `qf data …`), `tests/architecture/test_repository_files_tracked.py` (D-028).
+- Шаг 3: `tests/fixtures/raw_mini/README.md` (описание фикстуры).
 - Тесты сверх обязательных: `test_errors.py`, `test_paths.py`, `test_seed.py`, `test_logging.py`, `test_wiring.py`, `tests/contracts/test_versions.py`, `tests/contracts/test_generation.py`, `tests/architecture/helpers.py` (общие статические проверки).
 
 ## Версии пакетов, разрешённые `uv lock` (23.09.2026)

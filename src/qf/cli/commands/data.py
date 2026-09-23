@@ -5,23 +5,51 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 from qf.cli.wiring import build
-from qf.common import CONFIGS, load_yaml_config, project_root
-from qf.data import RAW_SOURCES, SourceFileConfig, fetch_raw_dataset, verify_raw_dataset
+from qf.common import CONFIGS, DATA_PROCESSED, load_yaml_config, project_root
+from qf.data import (
+    RAW_SOURCES,
+    Expectations,
+    SourceFileConfig,
+    fetch_raw_dataset,
+    profile_raw_dataset,
+    raw_dataset_path,
+    verify_raw_dataset,
+)
 
-__all__ = ["DEFAULT_SOURCE_CONFIG", "configure_fetch", "run_fetch"]
+__all__ = [
+    "DEFAULT_EXPECTATIONS",
+    "DEFAULT_SOURCE_CONFIG",
+    "configure_fetch",
+    "configure_profile",
+    "run_fetch",
+    "run_profile",
+]
 
 DEFAULT_SOURCE_CONFIG = CONFIGS / "data" / "source.yaml"
+DEFAULT_EXPECTATIONS = CONFIGS / "data" / "expectations.yaml"
 
 
-def configure_fetch(parser: argparse.ArgumentParser) -> None:
+def _add_source_config(parser: argparse.ArgumentParser, flag: str) -> None:
     parser.add_argument(
-        "--config",
+        flag,
+        dest="source_config",
         type=Path,
         default=None,
         help=f"source config (default: <project>/{DEFAULT_SOURCE_CONFIG})",
     )
+
+
+def _load_source(root: Path, config_path: Path | None) -> tuple[Any, SourceFileConfig]:
+    path = config_path if config_path is not None else root / DEFAULT_SOURCE_CONFIG
+    file_config = load_yaml_config(path, SourceFileConfig)
+    return build(RAW_SOURCES, file_config.source), file_config
+
+
+def configure_fetch(parser: argparse.ArgumentParser) -> None:
+    _add_source_config(parser, "--config")
     parser.add_argument(
         "--verify-only",
         action="store_true",
@@ -31,9 +59,7 @@ def configure_fetch(parser: argparse.ArgumentParser) -> None:
 
 def run_fetch(args: argparse.Namespace) -> int:
     root = project_root()
-    config_path: Path = args.config if args.config is not None else root / DEFAULT_SOURCE_CONFIG
-    file_config = load_yaml_config(config_path, SourceFileConfig)
-    source = build(RAW_SOURCES, file_config.source)
+    source, file_config = _load_source(root, args.source_config)
     if args.verify_only:
         ref, problems = verify_raw_dataset(source, root=root)
         if problems:
@@ -51,4 +77,39 @@ def run_fetch(args: argparse.Namespace) -> int:
         print(f"Run manifest: {result.run_dir}")
     else:
         print(f"Already present and verified: {result.ref.path}; nothing downloaded")
+    return 0
+
+
+def configure_profile(parser: argparse.ArgumentParser) -> None:
+    _add_source_config(parser, "--source-config")
+    parser.add_argument(
+        "--expectations",
+        type=Path,
+        default=None,
+        help=f"expected table properties (default: <project>/{DEFAULT_EXPECTATIONS})",
+    )
+
+
+def run_profile(args: argparse.Namespace) -> int:
+    root = project_root()
+    source, _ = _load_source(root, args.source_config)
+    expectations_path = args.expectations or root / DEFAULT_EXPECTATIONS
+    expectations = load_yaml_config(expectations_path, Expectations)
+    outcome = profile_raw_dataset(
+        raw_dataset_path(source, root),
+        expectations,
+        root=root,
+        out_dir=root / DATA_PROCESSED,
+        expectations_config=expectations.model_dump(mode="json"),
+    )
+    for check in outcome.report.checks:
+        status = "PASS" if check.passed else "FAIL"
+        print(f"{status}  {check.name}")
+        for detail in check.details if not check.passed else []:
+            print(f"      {detail}")
+    print(f"Report: {outcome.json_path} and {outcome.markdown_path}")
+    print(f"Run manifest: {outcome.run_dir}")
+    if not outcome.report.passed:
+        print(f"qf: profile failed: {', '.join(outcome.report.failed_checks)}", file=sys.stderr)
+        return 1
     return 0

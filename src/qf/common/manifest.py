@@ -6,7 +6,9 @@ import importlib.metadata
 import re
 import secrets
 import subprocess
+import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -14,16 +16,18 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qf.common.errors import QFError
-from qf.common.paths import atomic_write_text
+from qf.common.paths import RUNS, atomic_write_text
 
 __all__ = [
     "MANIFEST_FILENAME",
     "RunManifest",
+    "RunRecorder",
     "RunStatus",
     "collect_git_info",
     "collect_package_versions",
     "new_run_id",
     "read_manifest",
+    "start_run",
     "update_manifest",
     "write_manifest",
 ]
@@ -134,3 +138,54 @@ def update_manifest(run_dir: Path, **fields: Any) -> RunManifest:
         raise QFError(f"invalid manifest update for {run_dir}: {exc}") from exc
     write_manifest(updated, run_dir)
     return updated
+
+
+_BASE_PACKAGES = ("quattro-formaggi",)
+
+
+@dataclass(frozen=True)
+class RunRecorder:
+    """Common bookkeeping of one run: id, start time and the final `run_manifest.json`."""
+
+    kind: str
+    run_id: str
+    root: Path
+    created_at: datetime
+    started_monotonic: float
+
+    @property
+    def run_dir(self) -> Path:
+        return self.root / RUNS / self.run_id
+
+    def finish(
+        self, *, packages: Iterable[str] = (), status: RunStatus = "completed", **fields: Any
+    ) -> RunManifest:
+        """Write the manifest with git state, package versions and wall time filled in."""
+        git_commit, git_dirty = collect_git_info(self.root)
+        try:
+            manifest = RunManifest(
+                run_id=self.run_id,
+                kind=self.kind,
+                created_at=self.created_at,
+                status=status,
+                git_commit=git_commit,
+                git_dirty=git_dirty,
+                package_versions=collect_package_versions([*_BASE_PACKAGES, *packages]),
+                wall_time_s=round(time.monotonic() - self.started_monotonic, 3),
+                **fields,
+            )
+        except ValidationError as exc:
+            raise QFError(f"invalid manifest for run {self.run_id}: {exc}") from exc
+        write_manifest(manifest, self.run_dir)
+        return manifest
+
+
+def start_run(kind: str, root: Path) -> RunRecorder:
+    """Begin a run under `root/runs/`; call `finish()` once the run has produced its outputs."""
+    return RunRecorder(
+        kind=kind,
+        run_id=new_run_id(kind),
+        root=root,
+        created_at=datetime.now(UTC),
+        started_monotonic=time.monotonic(),
+    )

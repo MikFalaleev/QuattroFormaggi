@@ -1,0 +1,36 @@
+# What the raw tables must look like for `qf data profile` (IMPLEMENTATION_PLAN.md step 3, B.1).
+# These values were taken from the pinned revision 54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07;
+# the profile is a regression guard: if the data ever differs, the pipeline stops here.
+row_counts:
+  loads: 85410
+  routes: 58
+  customers: 200
+  delivery_events: 170820
+weight_lbs_min: 10000
+weight_lbs_max: 45000
+pieces_max: 28
+max_transit_days: 3
+load_types: [Dry Van, Refrigerated]
+freight_types: [General, Retail, Consumer Goods, Food/Beverage, Automotive, Electronics]
+max_null_rate: 0.0
+cities:
+  Atlanta: GA
+  Charlotte: NC
+  Chicago: IL
+  Columbus: OH
+  Dallas: TX
+  Denver: CO
+  Detroit: MI
+  Houston: TX
+  Indianapolis: IN
+  Kansas City: MO
+  Las Vegas: NV
+  Los Angeles: CA
+  Memphis: TN
+  Miami: FL
+  Minneapolis: MN
+  New York: NY
+  Philadelphia: PA
+  Phoenix: AZ
+  Portland: OR
+  Seattle: WA
