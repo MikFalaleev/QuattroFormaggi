@@ -10,17 +10,17 @@ Rules:
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from random import Random
 from typing import Protocol, runtime_checkable
 
 from qf.common import ArtifactRef
 from qf.contracts.facts import LoadFacts
-from qf.contracts.records import Language
+from qf.contracts.records import Language, SFTRecord
 from qf.contracts.rendering import RenderedRequest, RequestDraft
 
-__all__ = ["FactsBuilder", "HardCase", "RawSource", "TemplateFamily"]
+__all__ = ["FactsBuilder", "HardCase", "RawSource", "Splitter", "TemplateFamily"]
 
 
 @runtime_checkable
@@ -87,4 +87,14 @@ class HardCase(Protocol):
 
     def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
         """A new draft with the difficulty added; the input draft is not changed."""
+        ...
+
+
+@runtime_checkable
+class Splitter(Protocol):
+    """Assigns splits to records that come without one (step 7); every record of a group gets
+    the same split. Parameters (seed, ratios) are the implementation's `Config`."""
+
+    def assign(self, records: Sequence[SFTRecord]) -> list[SFTRecord]:
+        """The same records, in the same order, with `split` set."""
         ...

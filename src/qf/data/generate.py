@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from random import Random
-from typing import Any, Final, Literal, TypeVar
+from typing import Final, Literal, TypeVar
 
 from pydantic import Field, model_validator
 
@@ -22,14 +22,11 @@ from qf.common import (
     ArtifactRef,
     QFError,
     StrictConfig,
-    atomic_write_text,
     read_artifact,
     sha256_file,
     start_run,
-    write_artifact,
 )
 from qf.contracts import (
-    SFT_RECORD_SCHEMA_VERSION,
     HardCase,
     Language,
     LoadFacts,
@@ -44,6 +41,7 @@ from qf.contracts import (
 from qf.data.facts import load_facts
 from qf.data.registries import HARD_CASES, TEMPLATE_FAMILIES
 from qf.data.render import HardCaseNotApplicable
+from qf.data.sft_io import write_sft_records
 from qf.domain import (
     build_messages,
     check_record,
@@ -384,15 +382,6 @@ class GenerateResult:
     run_dir: Path
 
 
-def _write_split(
-    records: Sequence[SFTRecord], path: Path, *, run_id: str, parent: str, root: Path,
-    extra: Mapping[str, Any],
-) -> ArtifactRef:  # fmt: skip
-    atomic_write_text(path, "".join(record.model_dump_json() + "\n" for record in records))
-    return write_artifact(path, "sft_dataset", SFT_RECORD_SCHEMA_VERSION, run_id, [parent],
-                          extra=extra, root=root)  # fmt: skip
-
-
 def _counts(records: Sequence[SFTRecord]) -> dict[str, dict[str, int]]:
     def count(values: Sequence[str]) -> dict[str, int]:
         return dict(sorted(Counter(values).items()))
@@ -424,11 +413,11 @@ def generate_dataset(
     outputs: dict[str, Sequence[SFTRecord]] = {name: items for name, items in records.items()}
     outputs["smoke"] = records["train"][: cfg.pool.smoke]
     refs = {
-        name: _write_split(
+        name: write_sft_records(
             items,
             out_dir / f"{name}.jsonl",
             run_id=run.run_id,
-            parent=facts_ref.sha256,
+            parents=[facts_ref.sha256],
             root=root,
             extra={"split": name, "count": len(items), **shared, **_counts(items)},
         )  # fmt: skip

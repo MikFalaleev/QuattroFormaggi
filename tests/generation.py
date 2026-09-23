@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from functools import cache
@@ -10,8 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yaml
 
-from qf.common import load_yaml_config
+from qf.common import load_yaml_config, write_artifact
 from qf.contracts import LoadFacts, Quantity
 from qf.data import (
     GenerateConfig,
@@ -251,3 +253,27 @@ def violations(
             f"{g.record.id}: {p}" for p in check(g, facts[load_id], money.get(load_id, set()))
         ]
     return found[:10]
+
+
+# --- a small project on disk ------------------------------------------------------------
+
+RAW_TARGET = Path("data/raw/logistics-operations/54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07")
+
+
+def install_project(project: Path, **config_changes: Any) -> Path:
+    """Raw fixture as an artifact, the data configs and a small generator config."""
+    shutil.copytree(FIXTURE, project / RAW_TARGET)
+    (project / RAW_TARGET / "provenance.json").write_text(
+        (REPO_ROOT / "tests/fixtures/provenance_mini.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    write_artifact(
+        project / RAW_TARGET, "raw_dataset", "logistics_ops_csv_v1", "run-f", root=project
+    )
+    configs = project / "configs" / "data"
+    configs.mkdir(parents=True)
+    for name in ("source.yaml", "facts.yaml", "city_map_ru_v1.yaml"):
+        shutil.copy(REPO_ROOT / "configs" / "data" / name, configs / name)
+    config = small_config(**config_changes).model_dump(mode="json")
+    (configs / "generate_v1.yaml").write_text(yaml.safe_dump(config, allow_unicode=True))
+    return configs / "generate_v1.yaml"

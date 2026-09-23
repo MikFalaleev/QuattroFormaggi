@@ -1191,7 +1191,7 @@ CLI: `qf data build [--config configs/data/generate_v1.yaml]`. Первый эт
 **Функции:**
 
 - **`qf/data/split.py`:**
-  - `GroupHashSplitter` — реализация порта `Splitter`, регистрируется в `SPLITTERS` как `group_hash`. Метод `assign(records, cfg)`, внутри `assign_splits(records, ratios, seed, holdout) -> list[SFTRecord]` — для датасетов, собранных вне генератора (например, будущие ручные примеры). Разбивка по `group_id` через стабильный хэш `sha256(f"{seed}:{group_id}")`: ни одна группа не попадает в два сплита.
+  - `GroupHashSplitter` — реализация порта `Splitter`, регистрируется в `SPLITTERS` как `group_hash`. Метод `assign(records, cfg)` (**реализовано:** `assign(records)`, параметры — `Config` реализации, D-062), внутри `assign_splits(records, ratios, seed, holdout) -> list[SFTRecord]` — для датасетов, собранных вне генератора (например, будущие ручные примеры). Разбивка по `group_id` через стабильный хэш `sha256(f"{seed}:{group_id}")`: ни одна группа не попадает в два сплита.
   - `qf data split` — вызывается, если записи пришли без сплита; для `generated_v1` сплиты уже заданы генератором, и команда только проверяет их.
 - **`qf/data/validate.py`:** `validate_dataset(refs: dict[split, ArtifactRef], bench: ArtifactRef|None) -> ValidationReport`. Валидатор читает только артефакты `sft_dataset`/`benchmark` через `read_artifact` и контракты `qf.contracts`/`qf.domain`, не вызывая генератор (каждую строку JSONL — `SFTRecord.model_validate_json(line)`, не `json.loads` + `model_validate`, D-041): он должен одинаково проверять синтетику, ручные и будущие реальные записи. `Issue(record_id, split, code, message)`. Проверки одной записи (`UNKNOWN_TASK`, `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT`) уже реализованы в `qf.domain.check_record` (шаг 4) — вызвать её, а не писать заново. Коды:
   - `SCHEMA` — не проходит `SFTRecord`;
@@ -1206,7 +1206,8 @@ CLI: `qf data build [--config configs/data/generate_v1.yaml]`. Первый эт
   - `BENCH_LEAK` — `id`, `group_id` или нормализованный текст benchmark встречается в train/val;
   - `EMPTY_ASSISTANT`;
   - `ROLE_ORDER` — не [system, user, assistant];
-  - `PROMPT_MISMATCH` — системный промпт не совпадает с `system_extract_v1`.
+  - `PROMPT_MISMATCH` — системный промпт не совпадает с `system_extract_v1`;
+  - **добавлены при реализации (D-063):** `SPLIT_MISMATCH`, `DUP_ID`, `SMOKE_NOT_IN_TRAIN`, `HOLDOUT_MISMATCH`, `UNKNOWN_LOAD`; повтор текста внутри сплита — предупреждение `DUP_EXACT_IN_SPLIT`.
 
   Про шаблонную близость: тексты одного семейства похожи по конструкции — это ожидаемо и **не** считается утечкой. Защитой служат holdout-семейства и маршруты. Это нужно записать в DATA_SPEC.
 

@@ -17,7 +17,7 @@ from qf.contracts.card_v1 import (
 )
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
-from qf.contracts.ports import FactsBuilder, HardCase, RawSource, TemplateFamily
+from qf.contracts.ports import FactsBuilder, HardCase, RawSource, Splitter, TemplateFamily
 from qf.contracts.records import (
     RECORD_ROLES,
     SFT_RECORD_SCHEMA_VERSION,
@@ -64,6 +64,7 @@ __all__ = [
     "SFTRecord",
     "ShipmentCard",
     "SplitName",
+    "Splitter",
     "TargetSchemaVersion",
     "TaskName",
     "VariantInfo",

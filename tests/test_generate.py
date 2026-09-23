@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import shutil
 from collections import Counter
 from pathlib import Path
 from random import Random
 
 import pytest
-import yaml
 
 from qf.cli import main
-from qf.common import QFError, load_artifact_manifest, read_artifact, read_manifest, write_artifact
+from qf.common import QFError, load_artifact_manifest, read_artifact, read_manifest
 from qf.contracts import LoadFacts, RequestDraft, SFTRecord, supported_versions
 from qf.data import (
     HARD_CASES,
@@ -23,11 +21,11 @@ from qf.data.render import HardCaseNotApplicable
 from qf.domain import check_record, system_prompt_hash
 from tests.conftest import REPO_ROOT
 from tests.generation import (
-    FIXTURE,
     INVARIANTS,
     REAL_RAW,
     SOURCE_PREFIX,
     facts_of,
+    install_project,
     money_of,
     repo_config,
     small_config,
@@ -135,26 +133,6 @@ def test_new_family_needs_only_registration() -> None:
 
 
 # --- the stage and the CLI -----------------------------------------------------------------
-
-RAW_TARGET = Path("data/raw/logistics-operations/54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07")
-
-
-def install_project(project: Path, **config_changes: object) -> Path:
-    shutil.copytree(FIXTURE, project / RAW_TARGET)
-    (project / RAW_TARGET / "provenance.json").write_text(
-        (REPO_ROOT / "tests/fixtures/provenance_mini.json").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-    write_artifact(
-        project / RAW_TARGET, "raw_dataset", "logistics_ops_csv_v1", "run-f", root=project
-    )
-    configs = project / "configs" / "data"
-    configs.mkdir(parents=True)
-    for name in ("source.yaml", "facts.yaml", "city_map_ru_v1.yaml"):
-        shutil.copy(REPO_ROOT / "configs" / "data" / name, configs / name)
-    config = small_config(**config_changes).model_dump(mode="json")
-    (configs / "generate_v1.yaml").write_text(yaml.safe_dump(config, allow_unicode=True))
-    return configs / "generate_v1.yaml"
 
 
 def test_cli_build_writes_splits_and_manifest(

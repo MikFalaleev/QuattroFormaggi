@@ -8,43 +8,71 @@ from pathlib import Path
 from typing import Any
 
 from qf.cli.wiring import build
-from qf.common import CONFIGS, DATA_PROCESSED, load_yaml_config, project_root
+from qf.common import (
+    CONFIGS,
+    DATA_PROCESSED,
+    NotImplementedStageError,
+    QFError,
+    load_yaml_config,
+    project_root,
+    read_artifact,
+)
+from qf.contracts import supported_versions
 from qf.data import (
+    DATASET_FILES,
     FACTS_BUILDERS,
     LOAD_FACTS_FILENAME,
     RAW_SOURCES,
+    SPLIT_FILES,
+    SPLITTERS,
     Expectations,
     FactsFileConfig,
     GenerateConfig,
     SourceFileConfig,
+    SplitFileConfig,
     build_facts_artifact,
+    build_length_report,
     fetch_raw_dataset,
     generate_dataset,
     profile_raw_dataset,
     raw_dataset_path,
     read_provenance,
+    read_sft_records,
+    run_validation,
+    split_dataset,
+    split_issues,
     verify_raw_dataset,
 )
 
 __all__ = [
     "DEFAULT_EXPECTATIONS",
     "DEFAULT_FACTS_CONFIG",
+    "DEFAULT_DATA_DIR",
     "DEFAULT_GENERATE_CONFIG",
+    "DEFAULT_SPLIT_CONFIG",
     "DEFAULT_SOURCE_CONFIG",
     "configure_build",
     "configure_facts",
     "configure_fetch",
     "configure_profile",
+    "configure_report",
+    "configure_split",
+    "configure_validate",
     "run_build",
     "run_facts",
     "run_fetch",
     "run_profile",
+    "run_report",
+    "run_split",
+    "run_validate",
 ]
 
 DEFAULT_SOURCE_CONFIG = CONFIGS / "data" / "source.yaml"
 DEFAULT_EXPECTATIONS = CONFIGS / "data" / "expectations.yaml"
 DEFAULT_FACTS_CONFIG = CONFIGS / "data" / "facts.yaml"
 DEFAULT_GENERATE_CONFIG = CONFIGS / "data" / "generate_v1.yaml"
+DEFAULT_SPLIT_CONFIG = CONFIGS / "data" / "split.yaml"
+DEFAULT_DATA_DIR = DATA_PROCESSED / "generated_v1"
 
 
 def _add_source_config(parser: argparse.ArgumentParser, flag: str) -> None:
@@ -196,4 +224,121 @@ def run_build(args: argparse.Namespace) -> int:
     for name, ref in result.refs.items():
         print(f"{name}: {result.counts[name]} records -> {ref.path} (sha256 {ref.sha256[:12]})")
     print(f"Run manifest: {result.run_dir}")
+    return 0
+
+
+# --- step 7: validation, splits, length report ---------------------------------------------
+
+
+def _add_data_dir(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=None,
+        help=f"directory with the split files (default: <project>/{DEFAULT_DATA_DIR})",
+    )
+
+
+def _dataset_paths(root: Path, data_dir: Path | None) -> dict[str, Path]:
+    """Split files (all required) and smoke (if present) of a dataset directory."""
+    base = data_dir if data_dir is not None else root / DEFAULT_DATA_DIR
+    base = base if base.is_absolute() else root / base
+    missing = [name for name in SPLIT_FILES if not (base / f"{name}.jsonl").is_file()]
+    if missing:
+        raise QFError(f"{base}: missing split files {', '.join(missing)} (run `qf data build`)")
+    return {n: base / f"{n}.jsonl" for n in DATASET_FILES if (base / f"{n}.jsonl").is_file()}
+
+
+def configure_validate(parser: argparse.ArgumentParser) -> None:
+    _add_data_dir(parser)
+    parser.add_argument("--bench", type=Path, default=None, help="benchmark file to check too")
+
+
+def run_validate(args: argparse.Namespace) -> int:
+    root = project_root()
+    paths = _dataset_paths(root, args.data_dir)
+    out_path = next(iter(paths.values())).parent / "validation_report.json"
+    outcome = run_validation(paths, args.bench, root=root, out_path=out_path)
+    report = outcome.report
+    for name, info in report.datasets.items():
+        print(f"{name}: {info['records']} records")
+    for code, count in report.counts.items():
+        kind = "warning" if any(w.code == code for w in report.warnings) else "error"
+        print(f"{kind:7}  {code}: {count}")
+    for item in report.errors[:10]:
+        print(f"  {item.record_id} [{item.split}] {item.code}: {item.message}", file=sys.stderr)
+    print(f"Report: {outcome.ref.path}")
+    print(f"Run manifest: {outcome.run_dir}")
+    if not report.passed:
+        print(f"qf: validation failed: {len(report.errors)} error(s)", file=sys.stderr)
+        return 1
+    print(f"OK: 0 errors, {len(report.warnings)} warning(s)")
+    return 0
+
+
+def configure_split(parser: argparse.ArgumentParser) -> None:
+    _add_data_dir(parser)
+    parser.add_argument(
+        "--input", type=Path, default=None, help="dataset without splits: assign them by group"
+    )
+    parser.add_argument("--out-dir", type=Path, default=None, help="where to write the splits")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=f"splitter config (default: <project>/{DEFAULT_SPLIT_CONFIG})",
+    )
+
+
+def run_split(args: argparse.Namespace) -> int:
+    """With --input: assign splits by group. Without: check the splits of --data-dir."""
+    root = project_root()
+    if args.input is None:
+        datasets = {}
+        for name, path in _dataset_paths(root, args.data_dir).items():
+            if name in SPLIT_FILES:
+                versions = supported_versions("sft_dataset")
+                ref = read_artifact(path, "sft_dataset", versions, root=root)
+                datasets[name] = read_sft_records(root / ref.path, name)[0]
+        issues = split_issues(datasets)
+        for issue in issues[:10]:
+            line = f"  {issue.record_id} [{issue.split}] {issue.code}: {issue.message}"
+            print(line, file=sys.stderr)
+        if issues:
+            print(f"qf: {len(issues)} split problem(s)", file=sys.stderr)
+            return 1
+        counts = ", ".join(f"{name} {len(items)}" for name, items in datasets.items())
+        print(f"OK: splits already assigned, no group in two splits ({counts})")
+        return 0
+    if args.out_dir is None:
+        raise QFError("--input needs --out-dir")
+    file_config = load_yaml_config(args.config or root / DEFAULT_SPLIT_CONFIG, SplitFileConfig)
+    result = split_dataset(
+        build(SPLITTERS, file_config.splitter), args.input, root=root,
+        out_dir=args.out_dir if args.out_dir.is_absolute() else root / args.out_dir,
+        config=file_config.model_dump(mode="json"),
+    )  # fmt: skip
+    for name, ref in result.refs.items():
+        print(f"{name}: {result.counts[name]} records -> {ref.path}")
+    print(f"Run manifest: {result.run_dir}")
+    return 0
+
+
+def configure_report(parser: argparse.ArgumentParser) -> None:
+    _add_data_dir(parser)
+    parser.add_argument("--tokenizer", type=Path, default=None,
+                        help="tokenizer directory for token lengths (step 11)")  # fmt: skip
+
+
+def run_report(args: argparse.Namespace) -> int:
+    if args.tokenizer is not None:
+        raise NotImplementedStageError("11", "qf data report --tokenizer")
+    root = project_root()
+    paths = _dataset_paths(root, args.data_dir)
+    outcome = build_length_report(paths, root=root, out_dir=next(iter(paths.values())).parent)
+    for name, count in outcome.report["records"].items():
+        user = outcome.report["chars"][name]["user"]
+        print(f"{name}: {count} records, user chars p50 {user['p50']}, max {user['max']}")
+    print(f"Report: {outcome.ref.path} (and length_report.md next to it)")
+    print(f"Run manifest: {outcome.run_dir}")
     return 0

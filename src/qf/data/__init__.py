@@ -59,9 +59,65 @@ from qf.data.raw_tables import (
     load_raw_tables,
     pickup_delivery_by_load,
 )
-from qf.data.registries import FACTS_BUILDERS, HARD_CASES, RAW_SOURCES, TEMPLATE_FAMILIES
+from qf.data.registries import (
+    FACTS_BUILDERS,
+    HARD_CASES,
+    RAW_SOURCES,
+    SPLITTERS,
+    TEMPLATE_FAMILIES,
+)
+from qf.data.report import (
+    LENGTH_REPORT_VERSION,
+    ReportOutcome,
+    build_length_report,
+    length_report,
+    length_stats,
+)
+from qf.data.sft_io import DATASET_FILES, SPLIT_FILES, read_sft_records, write_sft_records
+from qf.data.split import (
+    GroupHashSplitter,
+    SplitFileConfig,
+    SplitResult,
+    assign_splits,
+    group_fraction,
+    split_dataset,
+    split_issues,
+)
+from qf.data.validate import (
+    MAIN_SPLITS,
+    VALIDATION_REPORT_VERSION,
+    ValidationOutcome,
+    ValidationReport,
+    normalized_request,
+    run_validation,
+    validate_dataset,
+)
 
 __all__ = [
+    "validate_dataset",
+    "run_validation",
+    "normalized_request",
+    "ValidationReport",
+    "ValidationOutcome",
+    "VALIDATION_REPORT_VERSION",
+    "MAIN_SPLITS",
+    "split_issues",
+    "split_dataset",
+    "group_fraction",
+    "assign_splits",
+    "SplitResult",
+    "SplitFileConfig",
+    "GroupHashSplitter",
+    "SPLITTERS",
+    "write_sft_records",
+    "read_sft_records",
+    "SPLIT_FILES",
+    "DATASET_FILES",
+    "length_stats",
+    "length_report",
+    "build_length_report",
+    "ReportOutcome",
+    "LENGTH_REPORT_VERSION",
     "render_record",
     "GeneratedRecord",
     "sample_loads",

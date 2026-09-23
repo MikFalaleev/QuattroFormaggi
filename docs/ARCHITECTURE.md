@@ -301,6 +301,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `relative_date` | `qf.data.render.hard_cases:RelativeDate` | 6 | нет |
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `distractor_numbers` | `qf.data.render.hard_cases:DistractorNumbers` | 6 | нет |
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `city_lang_switch` | `qf.data.render.hard_cases:CityLangSwitch` | 6 | нет |
+| `Splitter` | `SPLITTERS` (`qf.data`, kind `splitter`) | `group_hash` | `qf.data.split:GroupHashSplitter` | 7 | нет |
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
@@ -333,3 +334,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - Реестры `TEMPLATE_FAMILIES` и `HARD_CASES` лежат в `qf/data/registries.py`; пакет `qf.data.render` регистрирует T1–T8 и 7 трудных случаев при импорте (его импортирует `qf.data`).
 - Семейства — наследники `LayoutFamily` (`render/base.py`): только слоты-предложения и их порядки; раскладку с проверкой «каждое поле размещено ровно один раз» и сборку эталона из evidence выполняет общий код. Новое семейство = класс со слотами + регистрация + строка в конфиге; контрактный тест проверит его автоматически.
 - `qf data build` = стадия фактов (шаг 5) + стадия генерации; две записи `run_manifest.json`.
+
+## Реализация на шаге 7: отличия от текста Части C
+
+- Порт `Splitter`: `assign(records)` без `cfg` — параметры у реализации (`Config`), как у остальных адаптеров (D-062).
+- Файлы записей читает и пишет один модуль `qf/data/sft_io.py` (D-064); валидатор находит маршрут записи через родительский артефакт `load_facts` (`qf.common.lineage` + `read_artifact`), а не через код генератора.

@@ -1,0 +1,8 @@
+# Step 7: `qf data split --input FILE --out-dir DIR` assigns splits to records that come without
+# one (e.g. future hand-written or real requests). generated_v1 already has its splits from the
+# generator; `qf data split` without --input only checks them.
+splitter:
+  name: group_hash
+  seed: 42
+  ratios: {train: 0.8, val: 0.1, test: 0.1}
+  holdout_groups: []          # group_ids that must go to test_ood
