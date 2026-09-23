@@ -1,3 +1,10 @@
-"""Generation backend adapters (fake, openai_local, hf_local). Filled from step 9."""
+"""Generation backends: adapters of the `GenerationBackend` port (plan C.2).
 
-__all__: list[str] = []
+Backends get ready messages from the caller and never build prompts (they do not use
+`qf.domain`). Light backends register here; heavy ones (hf_local) lazily in `cli.wiring`.
+"""
+
+from qf.backends.fake import TIMEOUT, FakeBackend
+from qf.backends.registry import BACKENDS
+
+__all__ = ["BACKENDS", "TIMEOUT", "FakeBackend"]

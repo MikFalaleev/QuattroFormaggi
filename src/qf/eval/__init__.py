@@ -1,3 +1,101 @@
-"""Evaluation: metrics registry, statistics, harness, reports. Filled from step 9."""
+"""Evaluation: case scoring, the metric registry, statistics, the harness and reports (step 9).
 
-__all__: list[str] = []
+Importing the package registers the built-in metrics in `METRICS`.
+"""
+
+from qf.eval.harness import (
+    COMPARE_FILE,
+    METRICS_VERSION,
+    PREDICTIONS_VERSION,
+    RESUME_KEYS,
+    BenchRef,
+    BootstrapSettings,
+    EvalConfig,
+    GenerationSettings,
+    compare_stage,
+    load_bench,
+    metrics_table,
+    run_eval,
+)
+from qf.eval.metrics import (
+    CRITICAL_ERRORS,
+    FIELDS,
+    KEY_FIELDS,
+    METRICS,
+    WEIGHT_TOLERANCE_KG,
+    card_mass_kg,
+    score_prediction,
+    values_match,
+)
+from qf.eval.report import (
+    COMPARABLE_KEYS,
+    FAKE_BANNER,
+    SYNTHETIC_WARNING,
+    compare_runs,
+    render_report,
+)
+from qf.eval.results import (
+    EVAL_STATE_FILE,
+    METRICS_FILE,
+    PREDICTIONS_FILE,
+    REPORT_FILE,
+    SCORES_FILE,
+    EvalRun,
+    load_run,
+    read_predictions,
+)
+from qf.eval.slices import SLICES, SliceName, record_kind, slice_of
+from qf.eval.stats import (
+    bootstrap_ci,
+    mcnemar,
+    paired_bootstrap_diff,
+    percentile,
+    resample_indices,
+    statistic_ci,
+)
+
+__all__ = [
+    "COMPARABLE_KEYS",
+    "COMPARE_FILE",
+    "CRITICAL_ERRORS",
+    "EVAL_STATE_FILE",
+    "FAKE_BANNER",
+    "FIELDS",
+    "KEY_FIELDS",
+    "METRICS",
+    "METRICS_FILE",
+    "METRICS_VERSION",
+    "PREDICTIONS_FILE",
+    "PREDICTIONS_VERSION",
+    "REPORT_FILE",
+    "RESUME_KEYS",
+    "SCORES_FILE",
+    "SLICES",
+    "SYNTHETIC_WARNING",
+    "WEIGHT_TOLERANCE_KG",
+    "BenchRef",
+    "BootstrapSettings",
+    "EvalConfig",
+    "EvalRun",
+    "GenerationSettings",
+    "SliceName",
+    "bootstrap_ci",
+    "card_mass_kg",
+    "compare_runs",
+    "compare_stage",
+    "load_bench",
+    "load_run",
+    "mcnemar",
+    "metrics_table",
+    "paired_bootstrap_diff",
+    "percentile",
+    "read_predictions",
+    "record_kind",
+    "render_report",
+    "resample_indices",
+    "run_eval",
+    "score_prediction",
+    "slice_of",
+    "statistic_ci",
+    "values_match",
+]

@@ -303,6 +303,13 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `city_lang_switch` | `qf.data.render.hard_cases:CityLangSwitch` | 6 | нет |
 | `Splitter` | `SPLITTERS` (`qf.data`, kind `splitter`) | `group_hash` | `qf.data.split:GroupHashSplitter` | 7 | нет |
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
+| `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `fake` (подготовленные ответы по sha256 user-сообщения; не модель) | `qf.backends.fake:FakeBackend` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.origin`, `field_accuracy.destination`, `field_accuracy.pickup_date`, `field_accuracy.delivery_date`, `field_accuracy.equipment_type`, `field_accuracy.cargo_category`, `field_accuracy.pieces`, `field_accuracy.weight_total`, `field_accuracy.weight_per_piece`, `field_accuracy.temperature_c`, `field_accuracy.shipper_name` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `critical_error_count`, `critical_error_count.pieces_weight_swap`, `critical_error_count.wrong_unit_magnitude`, `critical_error_count.origin_destination_swap`, `critical_error_count.hallucinated_required_field`, `critical_error_count.missed_conflict` | `qf.eval.metrics.builtin:CountMetric` (подклассы, `_count`)` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy_micro` | `qf.eval.metrics.builtin:FieldAccuracyMicro`` | 9 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `missing_f1` | `qf.eval.metrics.builtin:MissingF1`` | 9 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
 
@@ -339,3 +346,12 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Порт `Splitter`: `assign(records)` без `cfg` — параметры у реализации (`Config`), как у остальных адаптеров (D-062).
 - Файлы записей читает и пишет один модуль `qf/data/sft_io.py` (D-064); валидатор находит маршрут записи через родительский артефакт `load_facts` (`qf.common.lineage` + `read_artifact`), а не через код генератора.
+
+## Реализация на шаге 9: отличия от текста Части C
+
+- Порт `Metric` (C.4): `name` и `higher_is_better` — свойства только для чтения; `value(case)` возвращает `MetricValue = float | int | bool | tuple[float, ...] | None`, `aggregate(values) -> float | None`. Кортеж нужен метрикам, которые складывают счётчики по всем кейсам, а не усредняют доли: `field_accuracy_micro` — (верных, оценённых), `missing_f1` — (TP, FP, FN). `None` у `aggregate` — «метрика к этим кейсам не применима» (например, `conflict_recall` без конфликтов). См. D-072.
+- Разбор файла SFT-записей (`parse_sft_jsonl`) перенесён из `qf.data` в `qf.domain` (`qf/domain/records_jsonl.py`): harness читает benchmark, а стадии не импортируют друг друга (D-073).
+- `qf.eval` разбит на модули: `metrics/` (разбор одного ответа `case_scoring.py`, реестр, метрики), `stats.py`, `slices.py` (срезы отчёта), `results.py` (`EvalRun` и файлы прогона), `harness.py` (`run_eval`, `compare_stage`), `report.py` (`render_report`, `compare_runs`). `EvalRun` вынесен в `results.py`, чтобы отчёт и harness не импортировали друг друга по кругу.
+- Порт `GenerationBackend`: `name` — свойство только для чтения. Harness ловит исключение backend'а и записывает его как `error` кейса (порт исключений не бросает, но нарушение контракта не должно терять кейс), D-076).
+- `qf eval run` не принимает `--backend fake`: fake-backend выбирается в конфиге (`backend: {name: fake, responses_file: …}`), как любой другой (D-077).
+

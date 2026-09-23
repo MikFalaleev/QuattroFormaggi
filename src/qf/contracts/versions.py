@@ -15,12 +15,13 @@ __all__ = ["SUPPORTED_SCHEMA_VERSIONS", "require_supported", "supported_versions
 SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "raw_dataset": frozenset({"logistics_ops_csv_v1"}),  # step 2
     "metrics": frozenset(
-        {"profile_report_v1", "validation_report_v1", "length_report_v1"}
-    ),  # steps 3, 7
+        {"profile_report_v1", "validation_report_v1", "length_report_v1", "metrics_v1"}
+    ),  # steps 3, 7, 9
     "sft_dataset": frozenset({"sft_record_v1"}),  # step 4 (files are written from step 6)
     "target": frozenset({"card_v1"}),  # step 4
     "load_facts": frozenset({"load_facts_v1"}),  # step 5
     "benchmark": frozenset({"sft_record_v1"}),  # step 7 reads it, step 8 writes it
+    "predictions": frozenset({"predictions_v1"}),  # step 9
 }
 
 

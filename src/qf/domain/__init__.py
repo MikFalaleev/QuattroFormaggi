@@ -13,6 +13,7 @@ from qf.domain.prompting import (
     system_prompt_hash,
 )
 from qf.domain.record_checks import check_record
+from qf.domain.records_jsonl import parse_sft_jsonl
 from qf.domain.rules import (
     DEFAULT_PIECES,
     REQUIRED_ORDER,
@@ -40,6 +41,7 @@ from qf.domain.units import (
 )
 
 __all__ = [
+    "parse_sft_jsonl",
     "system_prompt_hash",
     "render_value_per_piece",
     "load_system_prompt",

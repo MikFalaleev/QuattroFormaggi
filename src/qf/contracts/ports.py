@@ -16,11 +16,21 @@ from random import Random
 from typing import Protocol, runtime_checkable
 
 from qf.common import ArtifactRef
+from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LoadFacts
+from qf.contracts.generation import GenerationRequest, GenerationResult
 from qf.contracts.records import Language, SFTRecord
 from qf.contracts.rendering import RenderedRequest, RequestDraft
 
-__all__ = ["FactsBuilder", "HardCase", "RawSource", "Splitter", "TemplateFamily"]
+__all__ = [
+    "FactsBuilder",
+    "GenerationBackend",
+    "HardCase",
+    "Metric",
+    "RawSource",
+    "Splitter",
+    "TemplateFamily",
+]
 
 
 @runtime_checkable
@@ -97,4 +107,37 @@ class Splitter(Protocol):
 
     def assign(self, records: Sequence[SFTRecord]) -> list[SFTRecord]:
         """The same records, in the same order, with `split` set."""
+        ...
+
+
+@runtime_checkable
+class GenerationBackend(Protocol):
+    """Anything that answers chat messages: a fake, LM Studio, llama-server, HF (step 9+)."""
+
+    @property
+    def name(self) -> str: ...
+
+    def model_id(self) -> str:
+        """The model actually answering (resolved from the backend, never from a file name)."""
+        ...
+
+    def generate(self, req: GenerationRequest) -> GenerationResult:
+        """One answer. Timeouts and HTTP errors go to `result.error`; nothing is raised."""
+        ...
+
+
+@runtime_checkable
+class Metric(Protocol):
+    """One aggregated metric (step 9): a value per case and its own aggregation."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def higher_is_better(self) -> bool: ...
+
+    def value(self, case: CaseScore) -> MetricValue: ...
+
+    def aggregate(self, values: Sequence[MetricValue]) -> float | None:
+        """The metric over cases; None if no case applies (also for an empty list)."""
         ...

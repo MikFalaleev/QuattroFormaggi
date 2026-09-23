@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from qf import __version__
 from qf.cli.commands import bench, data, doctor
+from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
 __all__ = ["COMMANDS", "EXIT_ERROR", "EXIT_NOT_IMPLEMENTED", "EXIT_OK", "CommandSpec", "main"]
@@ -107,8 +108,20 @@ _SPECS = (
         bench.run_verify,
         bench.configure,
     ),
-    CommandSpec("eval run", "9", "run an evaluation from a config"),
-    CommandSpec("eval compare", "9", "paired comparison of two eval runs"),
+    CommandSpec(
+        "eval run",
+        "9",
+        "run an evaluation from a config",
+        eval_cmd.run_run,
+        eval_cmd.configure_run,
+    ),
+    CommandSpec(
+        "eval compare",
+        "9",
+        "paired comparison of two eval runs",
+        eval_cmd.run_compare,
+        eval_cmd.configure_compare,
+    ),
     CommandSpec("eval-baseline", "10", "baseline of the base model in LM Studio"),
     CommandSpec("tokens audit", "11", "audit tokenizer, chat template and loss mask"),
     CommandSpec("train estimate", "12", "estimate steps, time and cost of training"),

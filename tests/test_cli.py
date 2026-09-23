@@ -72,7 +72,7 @@ def test_unimplemented_command_exits_2(name: str, capsys: pytest.CaptureFixture[
     assert f"Stage {COMMANDS[name].stage} " in err
 
 
-@pytest.mark.parametrize("name", ["train run", "eval run", "lab"])
+@pytest.mark.parametrize("name", ["train run", "export gguf", "lab"])
 def test_unimplemented_command_with_arguments_still_exits_2(
     name: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

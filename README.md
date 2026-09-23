@@ -5,7 +5,7 @@
 - **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: запрос на перевозку → JSON-карточка груза (`card_v1`) + список недостающих полей; экспорт в GGUF для LM Studio.
 - **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля.
 
-Статус: реализованы **шаги 1–8** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`; независимая проверка датасета `qf validate-data` и отчёт длин; эталонный набор `qf bench …` — ждёт ручной проверки). Обучения и весов пока нет.
+Статус: реализованы **шаги 1–9** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`; независимая проверка датасета `qf validate-data` и отчёт длин; эталонный набор `bench_v1` — проверен и заморожен, `qf bench …`; метрики, статистика и eval-harness `qf eval run` / `qf eval compare`, пока проверенные только на подставных ответах fake-backend'а). Обучения, весов и результатов модели пока нет.
 
 Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TODO.md` (отложенные задачи и напоминания), `AGENTS.md` (правила для coding agents).
 
@@ -24,6 +24,16 @@ uv run qf data facts       # факты о 85 410 загрузках с росс
 uv run qf data build       # факты + 2 050 учебных записей → data/processed/generated_v1/*.jsonl
 uv run qf validate-data    # утечки, дубликаты, схема → generated_v1/validation_report.json (код 1 при ошибках)
 uv run qf data report      # состав и длины → generated_v1/length_report.{json,md}
+uv run qf bench verify     # замороженный bench_v1 совпадает со своим sha256
+```
+
+Проверка eval-harness без модели (fake-backend отвечает эталоном с внесёнными ошибками; это **не** результат модели):
+
+```bash
+uv run python -m tests.fake_eval   # ответы и конфиги → data/processed/fake_eval/
+uv run qf eval run --config data/processed/fake_eval/fake_bench_v1.yaml       # → runs/<run_id>/report.md
+uv run qf eval run --config data/processed/fake_eval/fake_bench_v1_gold.yaml
+uv run qf eval compare runs/<run_id A> runs/<run_id B>                        # → runs/<run_id>/compare.md
 ```
 
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); QLoRA-обучение — удалённая машина Linux + NVIDIA (≥24 GB VRAM). См. `docs/PROJECT.md`, раздел 4.
@@ -41,7 +51,7 @@ uv run qf data report      # состав и длины → generated_v1/length_
 | `qf data split [--data-dir DIR]`, `qf data split --input FILE --out-dir DIR [--config PATH]` | 7 | реализована |
 | `qf data report [--data-dir DIR]` (`--tokenizer` — шаг 11) | 7 | реализована |
 | `qf bench export-review / import-review / freeze [--manual FILE] / verify` | 8 | реализованы; порядок — `docs/EVAL_SPEC.md` |
-| `qf eval run`, `qf eval compare` | 9 | не реализованы |
+| `qf eval run --config PATH [--resume RUN_DIR]`, `qf eval compare RUN_A RUN_B` | 9 | реализованы (backend `fake`; LM Studio — шаг 10); метрики — `docs/EVAL_SPEC.md` |
 | `qf eval-baseline` | 10 | не реализована |
 | `qf tokens audit` | 11 | не реализована |
 | `qf train estimate`, `qf train run` | 12 | не реализованы |

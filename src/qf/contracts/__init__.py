@@ -15,9 +15,18 @@ from qf.contracts.card_v1 import (
     ShipmentCard,
     WeightUnit,
 )
+from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
-from qf.contracts.ports import FactsBuilder, HardCase, RawSource, Splitter, TemplateFamily
+from qf.contracts.ports import (
+    FactsBuilder,
+    GenerationBackend,
+    HardCase,
+    Metric,
+    RawSource,
+    Splitter,
+    TemplateFamily,
+)
 from qf.contracts.records import (
     RECORD_ROLES,
     SFT_RECORD_SCHEMA_VERSION,
@@ -34,6 +43,10 @@ from qf.contracts.rendering import RenderedField, RenderedRequest, RequestDraft
 from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, supported_versions
 
 __all__ = [
+    "MetricValue",
+    "Metric",
+    "GenerationBackend",
+    "CaseScore",
     "TemplateFamily",
     "RequestDraft",
     "RenderedRequest",
