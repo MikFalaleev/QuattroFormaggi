@@ -11,7 +11,13 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from qf.common.errors import QFError
 from qf.common.hashing import sha256_json
 
-__all__ = ["ComponentConfig", "StrictConfig", "config_hash", "load_yaml_config"]
+__all__ = [
+    "ComponentConfig",
+    "StrictConfig",
+    "config_hash",
+    "format_validation_error",
+    "load_yaml_config",
+]
 
 
 class StrictConfig(BaseModel):
@@ -35,7 +41,8 @@ class ComponentConfig(BaseModel):
 ConfigT = TypeVar("ConfigT", bound=BaseModel)
 
 
-def _format_validation_error(exc: ValidationError) -> str:
+def format_validation_error(exc: ValidationError) -> str:
+    """One line per error: `field.path: message`."""
     return "; ".join(
         f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
         for error in exc.errors()
@@ -59,7 +66,7 @@ def load_yaml_config(path: Path, model: type[ConfigT]) -> ConfigT:
     try:
         return model.model_validate(raw)
     except ValidationError as exc:
-        raise QFError(f"{path}: {_format_validation_error(exc)}") from exc
+        raise QFError(f"{path}: {format_validation_error(exc)}") from exc
 
 
 def config_hash(cfg: BaseModel) -> str:

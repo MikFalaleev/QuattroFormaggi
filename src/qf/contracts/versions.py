@@ -1,7 +1,9 @@
 """Schema versions the current code can read, per artifact kind (plan C.7).
 
 This is the only place listing supported versions. Each step that introduces an artifact
-format adds its entry; an unknown version is an explicit error, never a guess.
+format adds its entry; an unknown version is an explicit error, never a guess. The key
+`target` is not an artifact kind: it lists the answer schemas inside records
+(`SFTRecord.schema_version`, `TaskSpec.target_schema_version`).
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ __all__ = ["SUPPORTED_SCHEMA_VERSIONS", "require_supported", "supported_versions
 SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "raw_dataset": frozenset({"logistics_ops_csv_v1"}),  # step 2
     "metrics": frozenset({"profile_report_v1"}),  # step 3
+    "sft_dataset": frozenset({"sft_record_v1"}),  # step 4 (files are written from step 6)
+    "target": frozenset({"card_v1"}),  # step 4
 }
 
 

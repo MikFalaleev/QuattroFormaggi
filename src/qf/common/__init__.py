@@ -17,7 +17,13 @@ from qf.common.artifacts import (
     sha256_dir,
     write_artifact,
 )
-from qf.common.config import ComponentConfig, StrictConfig, config_hash, load_yaml_config
+from qf.common.config import (
+    ComponentConfig,
+    StrictConfig,
+    config_hash,
+    format_validation_error,
+    load_yaml_config,
+)
 from qf.common.doctor import (
     DEFAULT_REPORT_PATH,
     LMSTUDIO_MODELS_URL,
@@ -90,6 +96,7 @@ __all__ = [
     "collect_git_info",
     "collect_package_versions",
     "config_hash",
+    "format_validation_error",
     "format_environment_report",
     "lineage",
     "load_artifact_manifest",

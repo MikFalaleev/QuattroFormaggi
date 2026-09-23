@@ -184,7 +184,7 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
 - **`temperature_c`:** в `card_v1` всегда `null` (в источнике нет данных).
 - **`missing_fields` вычисляет только функция `qf.domain.compute_missing_fields(card)`,** никогда LLM или человек. Порядок элементов фиксированный: `REQUIRED_ORDER`. Правило:
   - обязательны `origin`, `destination`, `pickup_date`, `equipment_type`, `pieces`;
-  - масса считается известной, если задан `weight_total` **или** (`weight_per_piece` и `pieces`); иначе в список добавляется `weight_total`;
+  - `weight_total` добавляется, только если не заданы **ни** `weight_total`, **ни** `weight_per_piece`. Если задан `weight_per_piece`, а `pieces` нет, в списке будет только `pieces` (оно обязательно само по себе): указав количество мест, пользователь закроет и массу (D-042);
   - если `equipment_type == "reefer"`, обязательно `temperature_c`;
   - если `equipment_type is None`, `temperature_c` не добавляется;
   - `delivery_date`, `shipper_name`, `cargo_category` не обязательны.
@@ -815,9 +815,9 @@ CLI:
 
 **Предусловия.** Шаг 3 принят.
 
-**Файлы:** `src/qf/contracts/card_v1.py`, `src/qf/contracts/records.py`, `src/qf/domain/tasks.py`, `src/qf/domain/serialization.py`, `src/qf/domain/units.py`, `src/qf/domain/rules.py`, `src/qf/domain/geo.py`, `tests/test_schema.py`, `tests/test_units.py`, `tests/test_rules.py`, `tests/test_geo.py`; обновить `__all__` в `qf/contracts/__init__.py` и `qf/domain/__init__.py`, `SUPPORTED_SCHEMA_VERSIONS` (`card_v1`, `sft_record_v1`); заполнить `docs/DATA_SPEC.md`.
+**Файлы:** `src/qf/contracts/card_v1.py`, `src/qf/contracts/records.py`, `src/qf/domain/tasks.py`, `src/qf/domain/serialization.py`, `src/qf/domain/units.py`, `src/qf/domain/rules.py`, `src/qf/domain/geo.py`, `src/qf/domain/record_checks.py`, `tests/test_schema.py`, `tests/test_units.py`, `tests/test_rules.py`, `tests/test_geo.py`, `tests/test_tasks.py`; обновить `__all__` в `qf/contracts/__init__.py` и `qf/domain/__init__.py`, `SUPPORTED_SCHEMA_VERSIONS` (`card_v1`, `sft_record_v1`); заполнить `docs/DATA_SPEC.md`.
 
-**`qf/contracts/card_v1.py`** (`SCHEMA_VERSION` … `ExtractionTarget`) и **`qf/contracts/records.py`** (`Message`, `VariantInfo`, `SFTRecord`). Все модели с `model_config = ConfigDict(extra="forbid", frozen=True)`:
+**`qf/contracts/card_v1.py`** (`SCHEMA_VERSION` … `ExtractionTarget`) и **`qf/contracts/records.py`** (`Message`, `VariantInfo`, `SFTRecord`). Все модели с `model_config = ConfigDict(extra="forbid", frozen=True)`. **Реализовано строже (D-041):** модели наследуют `ContractModel` (`qf/contracts/_model.py`: ещё `strict=True`, `allow_inf_nan=False`) — без приведения типов; JSON читается только `Model.model_validate_json(text)`:
 
 ```python
 SCHEMA_VERSION = "card_v1"
@@ -860,7 +860,7 @@ class SFTRecord(BaseModel):
 
 - `serialize_target(t: ExtractionTarget) -> str`: `json.dumps(t.model_dump(mode="json"), ensure_ascii=False, separators=(",",":"))`. Ключи в порядке объявления полей, **без** `sort_keys`. Это единственный способ получить содержимое ответа ассистента.
 - `parse_target(text: str) -> ExtractionTarget`: строгий разбор. Обрамление ```json не допускается и считается ошибкой формата. Отдельная функция `parse_target_lenient` снимает code fence и пробелы вокруг; её используют полевые метрики eval (шаг 9), но не `json_valid_rate`.
-- Валидатор уровня записи: `messages[2].content == serialize_target(parse_target(messages[2].content))`, то есть ответ канонизирован.
+- Валидатор уровня записи: `messages[2].content == serialize_target(parse_target(messages[2].content))`, то есть ответ канонизирован. Реализован как `qf.domain.check_record(record) -> list[Issue]` (`qf/domain/record_checks.py`) с кодами шага 7 (D-045).
 
 **`qf/domain/units.py`:**
 
@@ -1005,8 +1005,8 @@ tests/test_generate_determinism.py
 
 Функции `qf/domain/prompting.py`:
 
-- `load_system_prompt(version="v1") -> str` и `system_prompt_hash(version) -> str`. Хэш пишется в каждый манифест;
-- `build_messages(request_text: str, request_date: date, language: Literal["ru","en"], prompt_version="v1") -> list[Message]` — **единственное** место, где собираются system + user сообщения. Его вызывают генератор (шаг 6), runtime (шаг 18) и тесты. Формат user-сообщения — п. 6.2.
+- `load_system_prompt(version="system_extract_v1") -> str` и `system_prompt_hash(version) -> str`. `version` — полное имя файла промпта без расширения, как в `TaskSpec.system_prompt_version` (D-045). Хэш пишется в каждый манифест;
+- `build_messages(request_text: str, request_date: date, language: Literal["ru","en"], prompt_version="system_extract_v1") -> list[Message]` — **единственное** место, где собираются system + user сообщения. Его вызывают генератор (шаг 6), runtime (шаг 18) и тесты. Формат user-сообщения — п. 6.2.
 
 **6.2. Формат сообщения пользователя:**
 
@@ -1015,7 +1015,7 @@ tests/test_generate_determinism.py
 
 `request_date = pickup_date − k дней`, `k ~ Uniform{0..7}` (seeded RNG). Это синтетическое поле; в DATA_SPEC указано, что его нет в источнике.
 
-**6.3. Механизм evidence.** Каждая функция рендера поля возвращает `RenderedField(text: str, field: FieldName, gold_value: Any)`. Шаблон семейства собирает текст из фрагментов. Генератор возвращает (типы `RenderedField`, `RenderedRequest` и `RequestDraft` — в `qf/contracts/rendering.py`, frozen Pydantic-модели; `RequestDraft` — план записи до рендера: язык, единица веса, стиль дат, `dropped_fields`, конфликты, отвлекающие числа):
+**6.3. Механизм evidence.** Каждая функция рендера поля возвращает `RenderedField(text: str, field: FieldName, gold_value: Any)`. Шаблон семейства собирает текст из фрагментов. Генератор возвращает (типы `RenderedField`, `RenderedRequest` и `RequestDraft` — в `qf/contracts/rendering.py`, frozen Pydantic-модели, наследники `ContractModel` (D-041); даты в `VariantInfo` и карточке передавать объектами `date`, не строками; `RequestDraft` — план записи до рендера: язык, единица веса, стиль дат, `dropped_fields`, конфликты, отвлекающие числа):
 
 ```python
 class RenderedRequest(BaseModel):  # frozen, extra="forbid"
@@ -1194,8 +1194,9 @@ CLI: `qf data build [--config configs/data/generate_v1.yaml]`.
 - **`qf/data/split.py`:**
   - `GroupHashSplitter` — реализация порта `Splitter`, регистрируется в `SPLITTERS` как `group_hash`. Метод `assign(records, cfg)`, внутри `assign_splits(records, ratios, seed, holdout) -> list[SFTRecord]` — для датасетов, собранных вне генератора (например, будущие ручные примеры). Разбивка по `group_id` через стабильный хэш `sha256(f"{seed}:{group_id}")`: ни одна группа не попадает в два сплита.
   - `qf data split` — вызывается, если записи пришли без сплита; для `generated_v1` сплиты уже заданы генератором, и команда только проверяет их.
-- **`qf/data/validate.py`:** `validate_dataset(refs: dict[split, ArtifactRef], bench: ArtifactRef|None) -> ValidationReport`. Валидатор читает только артефакты `sft_dataset`/`benchmark` через `read_artifact` и контракты `qf.contracts`/`qf.domain`, не вызывая генератор: он должен одинаково проверять синтетику, ручные и будущие реальные записи. `Issue(record_id, split, code, message)`. Коды:
+- **`qf/data/validate.py`:** `validate_dataset(refs: dict[split, ArtifactRef], bench: ArtifactRef|None) -> ValidationReport`. Валидатор читает только артефакты `sft_dataset`/`benchmark` через `read_artifact` и контракты `qf.contracts`/`qf.domain`, не вызывая генератор (каждую строку JSONL — `SFTRecord.model_validate_json(line)`, не `json.loads` + `model_validate`, D-041): он должен одинаково проверять синтетику, ручные и будущие реальные записи. `Issue(record_id, split, code, message)`. Проверки одной записи (`UNKNOWN_TASK`, `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT`) уже реализованы в `qf.domain.check_record` (шаг 4) — вызвать её, а не писать заново. Коды:
   - `SCHEMA` — не проходит `SFTRecord`;
+  - `UNKNOWN_TASK` — `task` не зарегистрирована в `TASKS` (D-040, D-045);
   - `TARGET_PARSE` — ассистентский JSON не разбирается;
   - `TARGET_INCONSISTENT` — `check_target_consistency` вернула ошибки;
   - `NOT_CANONICAL` — ответ не в канонической сериализации;
@@ -1312,9 +1313,9 @@ CLI: `qf bench export-review`, `qf bench import-review --csv …`, `qf bench fre
 **Метрики (`metrics.py`):**
 
 - **`score_prediction(gold: ExtractionTarget, raw_output: str) -> CaseScore`**, где `CaseScore`:
-  - `json_parsed: bool` — строгий `parse_target` без повторов и исправлений;
+  - `json_parsed: bool` — строгий `parse_target` без повторов и исправлений (ложь, если `TargetParseError.stage == "format"`);
   - `json_parsed_lenient: bool` — диагностика;
-  - `schema_valid: bool`;
+  - `schema_valid: bool` (ложь также при `TargetParseError.stage == "schema"`, шаг 4);
   - `field_correct: dict[FieldName, bool|None]` (`None` — поле не оценивается);
   - `missing_tp/fp/fn`, `missing_exact: bool`;
   - `conflict_detected: bool|None`;

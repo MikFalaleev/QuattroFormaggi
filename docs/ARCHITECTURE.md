@@ -36,8 +36,9 @@ src/qf/
 │   ├── logging.py
 │   └── seed.py
 ├── contracts/           # КОНТРАКТЫ (типы и интерфейсы; зависит только от common)
+│   ├── _model.py        #   ContractModel (strict, frozen, extra=forbid), NonEmptyStr — шаг 4
 │   ├── card_v1.py       #   ShipmentCard, Quantity, Place, Conflict, ExtractionTarget
-│   ├── records.py       #   Message, SFTRecord, VariantInfo
+│   ├── records.py       #   SFTRecord, VariantInfo (Message — из generation.py)
 │   ├── generation.py    #   GenerationRequest, GenerationResult
 │   ├── facts.py         #   LoadFacts (шаг 5)
 │   ├── rendering.py     #   RenderedField, RenderedRequest, RequestDraft (шаг 6)
@@ -51,6 +52,8 @@ src/qf/
 │   ├── rules.py         #   compute_missing_fields, check_target_consistency, total_weight_kg
 │   ├── geo.py           #   20 городов, RU/EN названия, штаты
 │   ├── serialization.py #   serialize_target, parse_target, parse_target_lenient
+│   ├── tasks.py         #   TaskSpec, реестр задач TASKS (D-040) — шаг 4
+│   ├── record_checks.py #   check_record: проверки одной SFT-записи (коды шага 7) — шаг 4
 │   ├── prompting.py     #   load_system_prompt, build_messages (единые для data/training/runtime)
 │   ├── prompts/         #   system_extract_v1.txt (package data)
 │   └── validation.py    #   независимая проверка значений карточки (даты, диапазоны, города) — шаг 18
@@ -282,6 +285,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | Порт | Реестр | Имя в реестре | Модуль | Шаг | Ленивая регистрация |
 |---|---|---|---|---|---|
 | `RawSource` | `RAW_SOURCES` (`qf.data`, kind `raw_source`) | `hf_dataset` | `qf.data.fetch:HFDatasetSource` | 2 | нет (лёгкая: `huggingface_hub` — core-зависимость) |
+| — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
 
@@ -291,3 +295,12 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - Порт `RawSource` (шаг 2) шире строки таблицы C.4: `target(dest_root) -> Path` (где лежит или будет лежать артефакт — нужен для идемпотентного `qf data fetch` и `--verify-only`) и `fetch(dest_root, run_id)` (run создаёт вызывающий сценарий `fetch_raw_dataset`, а не адаптер: общая логика «уже скачано → проверить» и запись `run_manifest.json` не дублируются в каждой реализации). См. D-023.
 - Форматы на диске версионируются полями `manifest_version` (`run_manifest_v1`), `artifact_manifest_version` (`artifact_manifest_v1`), `report_version` (`doctor_v1`) (D-019).
 - `Registry(kind, port=..., discoverable=True)`: реестр хранит свой порт (для проверки «у каждого порта есть реализация») и регистрируется в глобальном списке `all_registries()`; частные реестры в тестах создаются с `discoverable=False`.
+
+## Реализация на шаге 4: отличия от текста Части C
+
+- Модели контрактов `card_v1` и `sft_record_v1` наследуют `ContractModel` (`qf/contracts/_model.py`): кроме `extra="forbid", frozen=True` они строгие (`strict=True`, `allow_inf_nan=False`) — без приведения типов (D-041). JSON читается только через `Model.model_validate_json(text)`.
+- `Message` не дублируется в `records.py`: SFT-запись использует `Message` из `qf/contracts/generation.py` (шаг 1), чтобы сообщение для backend'а и сообщение записи были одним типом.
+- Версия `card_v1` экспортируется из `qf.contracts` как `CARD_SCHEMA_VERSION` (в модуле `card_v1.py` — `SCHEMA_VERSION`), чтобы будущая `card_v2` не конфликтовала по имени. В `SUPPORTED_SCHEMA_VERSIONS` добавлены `sft_dataset: {sft_record_v1}` и ключ `target: {card_v1}` — это не kind артефакта, а схемы ответа внутри записей (`SFTRecord.schema_version`, `TaskSpec.target_schema_version`).
+- Реестр задач `TASKS` не связан с портом (`port=None`): его записи — данные (`TaskSpec`), а не реализации. Он виден `all_registries()`, потому что `cli/wiring.py` импортирует `qf.domain`.
+- Проверки одной SFT-записи (`check_record`) вынесены в `qf/domain/record_checks.py` и возвращают `Issue` с кодами шага 7 (`UNKNOWN_TASK`, `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT`); `qf validate-data` (шаг 7) вызывает её и добавляет межзаписные проверки.
+- `qf.common.format_validation_error` стал публичным (раньше — приватная функция `config.py`): им же форматируются ошибки разбора ответа модели.
