@@ -1,7 +1,8 @@
-# Private data, weights and run outputs (IMPLEMENTATION_PLAN.md A.2.9)
-data/
-artifacts/
-runs/
+# Private data, weights and run outputs (IMPLEMENTATION_PLAN.md A.2.9).
+# Anchored to the repository root: the package src/qf/data/ and configs/data/ must stay tracked.
+/data/
+/artifacts/
+/runs/
 *.gguf
 *.safetensors
 *.bin

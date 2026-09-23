@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qf import __version__
-from qf.cli.commands import doctor
+from qf.cli.commands import data, doctor
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
 __all__ = ["COMMANDS", "EXIT_ERROR", "EXIT_NOT_IMPLEMENTED", "EXIT_OK", "CommandSpec", "main"]
@@ -40,7 +40,9 @@ class CommandSpec:
 
 _SPECS = (
     CommandSpec("doctor", "1", "read-only environment report", doctor.run, doctor.configure),
-    CommandSpec("data fetch", "2", "download the pinned raw dataset"),
+    CommandSpec(
+        "data fetch", "2", "download the pinned raw dataset", data.run_fetch, data.configure_fetch
+    ),
     CommandSpec("data profile", "3", "check raw table integrity"),
     CommandSpec("data build", "5-6", "build load facts and generate SFT records"),
     CommandSpec("data split", "7", "assign or check splits"),

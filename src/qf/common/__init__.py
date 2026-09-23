@@ -4,6 +4,7 @@ Other packages import only from here (`from qf.common import QFError`), never fr
 """
 
 from qf.common.artifacts import (
+    IGNORED_FILE_NAMES,
     MANIFEST_SUFFIX,
     ArtifactKind,
     ArtifactManifest,
@@ -59,6 +60,7 @@ __all__ = [
     "DATA_RAW",
     "DATA_SPLITS",
     "DEFAULT_REPORT_PATH",
+    "IGNORED_FILE_NAMES",
     "LMSTUDIO_MODELS_URL",
     "MANIFEST_FILENAME",
     "MANIFEST_SUFFIX",

@@ -27,6 +27,7 @@ from qf.common.paths import (
 )
 
 __all__ = [
+    "IGNORED_FILE_NAMES",
     "MANIFEST_SUFFIX",
     "ArtifactKind",
     "ArtifactManifest",
@@ -41,6 +42,8 @@ __all__ = [
 ]
 
 MANIFEST_SUFFIX = ".manifest.json"
+# OS-generated files (e.g. Finder creates .DS_Store when a folder is opened) are not content.
+IGNORED_FILE_NAMES = frozenset({".DS_Store"})
 _DEFAULT_SEARCH_DIRS = (DATA_RAW, DATA_PROCESSED, DATA_SPLITS, ARTIFACTS, RUNS)
 
 ArtifactKind = Literal[
@@ -86,11 +89,14 @@ class ArtifactManifest(BaseModel):
 
 
 def sha256_dir(path: Path) -> str:
-    """Hash of the sorted list of (relative POSIX path, file sha256); independent of walk order."""
+    """Hash of the sorted list of (relative POSIX path, file sha256); independent of walk order.
+
+    Files named in IGNORED_FILE_NAMES are skipped.
+    """
     entries = sorted(
         (file.relative_to(path).as_posix(), sha256_file(file))
         for file in path.rglob("*")
-        if file.is_file()
+        if file.is_file() and file.name not in IGNORED_FILE_NAMES
     )
     return sha256_json(entries)
 

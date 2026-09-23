@@ -58,7 +58,10 @@ def imports_of(path: Path, src: Path = SRC) -> list[ImportRef]:
 
 
 def _is_submodule(package: str, name: str, src: Path) -> bool:
-    return (src / package / f"{name}.py").is_file() or (src / package / name).is_dir()
+    # Compare exact names: macOS file systems are case-insensitive, so a Path.exists() check
+    # would mistake the class `Registry` for the module `registry.py`.
+    entries = {entry.name for entry in (src / package).iterdir()}
+    return f"{name}.py" in entries or (name in entries and (src / package / name).is_dir())
 
 
 def public_api_violations(package: str, src: Path = SRC) -> list[str]:

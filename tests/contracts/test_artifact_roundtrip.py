@@ -137,6 +137,8 @@ def test_dir_hash_independent_of_creation_order(tmp_path: Path) -> None:
         for name in order:
             _file(directory, name, f"content of {name}")
     assert sha256_dir(tmp_path / "one") == sha256_dir(tmp_path / "two")
+    (tmp_path / "two" / ".DS_Store").write_bytes(b"finder metadata")  # ignored OS junk
+    assert sha256_dir(tmp_path / "one") == sha256_dir(tmp_path / "two")
     (tmp_path / "two" / "d.txt").rename(tmp_path / "two" / "e.txt")
     assert sha256_dir(tmp_path / "one") != sha256_dir(tmp_path / "two")
 

@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+import qf.data  # noqa: F401  (imported for its registries: RAW_SOURCES)
 from qf.common import ComponentConfig, QFError, Registry
 
 __all__ = ["build"]

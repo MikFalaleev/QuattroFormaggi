@@ -10,7 +10,9 @@ from qf.common import QFError
 
 __all__ = ["SUPPORTED_SCHEMA_VERSIONS", "require_supported", "supported_versions"]
 
-SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {}
+SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
+    "raw_dataset": frozenset({"logistics_ops_csv_v1"}),  # step 2
+}
 
 
 def supported_versions(kind: str) -> frozenset[str]:

@@ -51,10 +51,10 @@ uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and n
 | Маркер | Когда используется | Когда запускать |
 |---|---|---|
 | `slow` | тест дольше 10 секунд | перед приёмкой шага: `uv run pytest -m slow` |
-| `network` | нужен интернет (HF Hub) | только с разрешения человека |
+| `network` | нужен интернет (HF Hub) | только с разрешения человека: `uv run pytest --run-network -m network` (без флага такие тесты пропускаются) |
 | `needs_tokenizer` | нужны локально скачанные файлы токенизатора Mistral-Nemo | после шага 11 |
-| `gpu` | нужна CUDA | только на удалённой GPU-машине |
-| `lmstudio` | нужен запущенный LM Studio server | только когда человек его запустил |
+| `gpu` | нужна CUDA | только на удалённой GPU-машине: `--run-gpu` |
+| `lmstudio` | нужен запущенный LM Studio server | только когда человек его запустил: `--run-lmstudio` |
 
 Порог покрытия для кода `src/qf/contracts`, `src/qf/domain`, `src/qf/common`, `src/qf/backends` (кроме `hf_local.py`), `src/qf/data`, `src/qf/eval`, `src/qf/training/features.py`, `src/qf/runtime`: не ниже 85% строк (`uv run pytest --cov=qf --cov-report=term-missing`). GPU-код покрывается CPU-тестами на крошечной модели везде, где это возможно.
 
@@ -340,7 +340,7 @@ flowchart BT
 
 | Порт | Методы | Реализации в v0.1 | Будущие замены (пример) |
 |---|---|---|---|
-| `RawSource` | `fetch(dest: Path) -> ArtifactRef`; `verify(ref) -> list[str]` | `hf_dataset` (шаг 2) | CSV из 1С/TMS, выгрузка реальных заявок |
+| `RawSource` | `target(dest_root: Path) -> Path`; `fetch(dest_root: Path, run_id: str) -> ArtifactRef`; `verify(ref) -> list[str]` | `hf_dataset` (шаг 2) | CSV из 1С/TMS, выгрузка реальных заявок |
 | `FactsBuilder` | `build(raw: ArtifactRef) -> Iterable[LoadFacts]` | `logistics_operations_v1` (шаг 5) | другой табличный источник |
 | `TemplateFamily` | `name: str`; `language: str`; `ood_only: bool`; `render(facts: LoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest` | T1–T8 (шаг 6) | новые стили, перефразирование локальной LLM |
 | `HardCase` | `name: str`; `applicable(facts: LoadFacts) -> bool`; `apply(draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft` (возвращает новый draft: какие поля убрать, какой конфликт вставить, какие отвлекающие числа добавить; семейство затем рендерит draft) | 7 видов (шаг 6) | новые трудные случаи |
@@ -711,24 +711,26 @@ uv run qf train run   # должен вернуть код 2
 
 **Файлы:** `configs/data/source.yaml`, `src/qf/data/fetch.py`, `tests/test_fetch.py`.
 
-`configs/data/source.yaml`:
+`configs/data/source.yaml` (параметры реализации вложены в блок `source:` рядом с её именем — открытый конфиг C.5):
 
 ```yaml
-repo_id: yogape/logistics-operations
-repo_type: dataset
-revision: 54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07
-license: MIT
-files: [loads.csv, routes.csv, customers.csv, delivery_events.csv, README.md, DATABASE_SCHEMA.txt]
-excluded_reason:
-  drivers.csv: "personal-data-shaped fields (names, license numbers, DOB); not needed"
-  other_tables: "not needed for card_v1"
+source:
+  name: hf_dataset
+  repo_id: yogape/logistics-operations
+  repo_type: dataset
+  revision: 54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07
+  license: MIT
+  files: [loads.csv, routes.csv, customers.csv, delivery_events.csv, README.md, DATABASE_SCHEMA.txt]
+  excluded_reason:
+    drivers.csv: "personal-data-shaped fields (names, license numbers, DOB); not needed"
+    other_tables: "not needed for card_v1"
 ```
 
 **Функции (`qf/data/fetch.py`):**
 
 - `class SourceConfig(BaseModel)`: поля из YAML; `revision` должен соответствовать regex `^[0-9a-f]{40}$`; ветка вроде `main` запрещена.
 - Добавить порт `RawSource` в `qf/contracts/ports.py` (первый порт проекта, C.4).
-- `class HFDatasetSource` — реализация порта `RawSource`, регистрируется в `RAW_SOURCES` под именем `hf_dataset`; в `source.yaml` добавить `source: {name: hf_dataset}`. `fetch()` возвращает `ArtifactRef(kind="raw_dataset", schema_version="logistics_ops_csv_v1")`, `verify()` — обёртка над `verify_provenance`.
+- `class HFDatasetSource` — реализация порта `RawSource`, регистрируется в `RAW_SOURCES` под именем `hf_dataset`; `HFDatasetSource.Config = SourceConfig` (параметры из блока `source:`). `fetch()` возвращает `ArtifactRef(kind="raw_dataset", schema_version="logistics_ops_csv_v1")`, `verify()` — обёртка над `verify_provenance`.
 - `fetch_dataset(cfg: SourceConfig, dest_root: Path) -> Path`: вызывает `huggingface_hub.hf_hub_download(repo_id, filename, repo_type="dataset", revision=cfg.revision, local_dir=dest)` для каждого файла из `cfg.files`, где `dest = dest_root / "logistics-operations" / cfg.revision`. Другие файлы не скачивает.
 - `write_provenance(dest: Path, cfg: SourceConfig) -> Path`: пишет `provenance.json` с полями `repo_id`, `revision`, `license`, `fetched_at` (UTC), `files: {name: {sha256, bytes}}`, `excluded`.
 - `verify_provenance(dest: Path) -> list[str]`: пересчитывает хэши и возвращает список расхождений.

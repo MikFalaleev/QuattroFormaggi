@@ -38,3 +38,14 @@ def test_checker_detects_deep_and_submodule_imports(tmp_path: Path) -> None:
     assert len(violations) == 2
     assert "qf.common.errors" in violations[0]
     assert "qf.common (errors)" in violations[1]
+
+
+def test_checker_is_case_sensitive(tmp_path: Path) -> None:
+    """`from qf.common import Registry` is a public name, not the module `registry.py`."""
+    src = tmp_path / "qf"
+    for package in ("common", "data"):
+        (src / package).mkdir(parents=True)
+        (src / package / "__init__.py").write_text("__all__ = []\n")
+    (src / "common" / "registry.py").write_text("class Registry: ...\n")
+    (src / "data" / "probe.py").write_text("from qf.common import Registry\n")
+    assert public_api_violations("data", src) == []

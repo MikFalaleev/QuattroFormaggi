@@ -4,6 +4,7 @@ Depends only on `qf.common`. Other packages import from here, never from submodu
 """
 
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
+from qf.contracts.ports import RawSource
 from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, supported_versions
 
 __all__ = [
@@ -11,6 +12,7 @@ __all__ = [
     "GenerationRequest",
     "GenerationResult",
     "Message",
+    "RawSource",
     "Role",
     "require_supported",
     "supported_versions",

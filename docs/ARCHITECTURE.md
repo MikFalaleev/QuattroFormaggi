@@ -278,13 +278,13 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 | Порт | Реестр | Имя в реестре | Модуль | Шаг | Ленивая регистрация |
 |---|---|---|---|---|---|
-
-На шаге 1 портов и реализаций нет: `qf/contracts/ports.py` пуст по правилу C.4, первый порт (`RawSource`) и его реализация появятся на шаге 2.
+| `RawSource` | `RAW_SOURCES` (`qf.data`, kind `raw_source`) | `hf_dataset` | `qf.data.fetch:HFDatasetSource` | 2 | нет (лёгкая: `huggingface_hub` — core-зависимость) |
 
 ## Реализация на шаге 1: отличия от текста Части C
 
 - Тяжёлые библиотеки в `qf.common` импортируются по имени во время выполнения только в двух местах — `common/doctor.py` и `common/seed.py` — через `qf.common._optional.import_optional`. Статический анализ `import-linter` таких импортов не видит, поэтому их набор ограничен и помечен комментариями в коде.
 - Команда оценки называется `qf eval run` (а не `qf eval`): имя команды не может одновременно быть группой (`qf eval compare`) — иначе argparse принимает позиционный аргумент за подкоманду.
 - `cli.wiring.build()` получает класс `Config` реализации, импортируя саму реализацию; путь к отдельному лёгкому модулю `Config` в ленивой записи реестра (C.5) пока не реализован — добавить на шаге 12, если конфиг обучения нужно валидировать без torch (D-021).
+- Порт `RawSource` (шаг 2) шире строки таблицы C.4: `target(dest_root) -> Path` (где лежит или будет лежать артефакт — нужен для идемпотентного `qf data fetch` и `--verify-only`) и `fetch(dest_root, run_id)` (run создаёт вызывающий сценарий `fetch_raw_dataset`, а не адаптер: общая логика «уже скачано → проверить» и запись `run_manifest.json` не дублируются в каждой реализации). См. D-023.
 - Форматы на диске версионируются полями `manifest_version` (`run_manifest_v1`), `artifact_manifest_version` (`artifact_manifest_v1`), `report_version` (`doctor_v1`) (D-019).
 - `Registry(kind, port=..., discoverable=True)`: реестр хранит свой порт (для проверки «у каждого порта есть реализация») и регистрируется в глобальном списке `all_registries()`; частные реестры в тестах создаются с `discoverable=False`.

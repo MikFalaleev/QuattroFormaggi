@@ -1,0 +1,13 @@
+# Raw dataset for `qf data fetch` (IMPLEMENTATION_PLAN.md step 2).
+# `source.name` selects the RawSource implementation from the RAW_SOURCES registry;
+# the remaining keys are that implementation's parameters (HFDatasetSource.Config).
+source:
+  name: hf_dataset
+  repo_id: yogape/logistics-operations
+  repo_type: dataset
+  revision: 54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07
+  license: MIT
+  files: [loads.csv, routes.csv, customers.csv, delivery_events.csv, README.md, DATABASE_SCHEMA.txt]
+  excluded_reason:
+    drivers.csv: "personal-data-shaped fields (names, license numbers, DOB); not needed"
+    other_tables: "not needed for card_v1"
