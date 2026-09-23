@@ -1279,6 +1279,8 @@ CLI: `qf data build [--config configs/data/generate_v1.yaml]`. Первый эт
 
 CLI: `qf bench export-review`, `qf bench import-review --csv …`, `qf bench freeze`, `qf bench verify`.
 
+**Реализовано (D-065…D-069):** шестой трудный срез `city_lang_switch` (8) и резерв по 2 записи в малых трудных срезах; `generated_v1` не меняется — заморозка пишет `bench_v1` и выборки без него в `data/splits/`; вердикты — `configs/eval/bench_v1_review.csv` в Git; ручные заявки — YAML (`qf bench freeze --manual`), код считает `missing_fields` и каноническую форму; общий regression-набор в bench_v1 не входит. **Время проверки — около 200 записей × 1–2 мин ≈ 3–6 часов.**
+
 **Тесты:**
 
 - `test_benchmark_composition_matches_config`;
@@ -1307,6 +1309,8 @@ CLI: `qf bench export-review`, `qf bench import-review --csv …`, `qf bench fre
 **Цель.** Метрики, независимая проверка значений, статистика и harness, который принимает любой backend. Всё тестируется на подставных ответах, без реальной модели.
 
 **Предусловия.** Шаг 8 принят.
+
+**Данные для оценки:** `bench_v1` и выборки test/test_ood без эталонных записей — в `data/splits/` (шаг 8, D-066).
 
 **Файлы:** `src/qf/contracts/evaluation.py` (`CaseScore`), порты `Metric` и `GenerationBackend` в `src/qf/contracts/ports.py`, `src/qf/eval/metrics/__init__.py` (реестр `METRICS`), `src/qf/eval/metrics/case_scoring.py`, `src/qf/eval/metrics/builtin.py`, `src/qf/eval/stats.py`, `src/qf/eval/harness.py`, `src/qf/eval/report.py`, `src/qf/backends/__init__.py` (реестр `BACKENDS`), `src/qf/backends/fake.py`, `tests/test_metrics.py`, `tests/test_stats.py`, `tests/test_harness.py`, `tests/contracts/test_backend_contract.py`, `tests/contracts/test_metric_contract.py`.
 

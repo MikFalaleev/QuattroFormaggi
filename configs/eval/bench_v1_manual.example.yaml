@@ -1,0 +1,25 @@
+# Пример ручных заявок для bench_v1 (docs/EVAL_SPEC.md, D-068).
+# Скопируйте в configs/eval/bench_v1_manual.yaml, замените пример своими заявками и добавьте
+# их ДО заморозки: uv run qf bench freeze --manual configs/eval/bench_v1_manual.yaml
+# Без персональных данных: вымышленные компании, без имён и телефонов.
+# В карточке все 11 полей; чего нет в тексте — null. Количество мест не указано — null (не 1).
+# Недостающие поля и каноническую форму ответа посчитает код. Города — по-русски с регионом.
+- author: example
+  language: ru                   # ru | en
+  request_date: 2026-09-20       # дата, от которой считаются «завтра» и т. п.
+  text: |
+    Добрый день! Нужен рефрижератор из Казани в Москву, 18 паллет, общий вес 12,5 т.
+    Загрузка 22.09.2026. Груз — продукты питания, отправитель ООО «Северный склад».
+  card:
+    shipper_name: ООО «Северный склад»
+    cargo_category: food_beverage          # general | retail | consumer_goods | food_beverage | automotive | electronics
+    equipment_type: reefer                 # dry_van | reefer
+    pieces: 18
+    weight_total: {value: 12.5, unit: t}   # как в тексте: kg | t | lb
+    weight_per_piece: null
+    origin: {city: Казань, region: Республика Татарстан}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-22
+    delivery_date: null
+    temperature_c: null
+  conflicts: []                  # если у поля два разных значения: [{field: pieces, values: [18, 20]}]

@@ -5,7 +5,7 @@
 - **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: запрос на перевозку → JSON-карточка груза (`card_v1`) + список недостающих полей; экспорт в GGUF для LM Studio.
 - **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля.
 
-Статус: реализованы **шаги 1–7** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`; независимая проверка датасета `qf validate-data` и отчёт длин). Обучения и весов пока нет.
+Статус: реализованы **шаги 1–8** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`; независимая проверка датасета `qf validate-data` и отчёт длин; эталонный набор `qf bench …` — ждёт ручной проверки). Обучения и весов пока нет.
 
 Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TODO.md` (отложенные задачи и напоминания), `AGENTS.md` (правила для coding agents).
 
@@ -40,7 +40,7 @@ uv run qf data report      # состав и длины → generated_v1/length_
 | `qf validate-data [--data-dir DIR] [--bench FILE]` | 7 | реализована |
 | `qf data split [--data-dir DIR]`, `qf data split --input FILE --out-dir DIR [--config PATH]` | 7 | реализована |
 | `qf data report [--data-dir DIR]` (`--tokenizer` — шаг 11) | 7 | реализована |
-| `qf bench export-review / import-review / freeze / verify` | 8 | не реализованы |
+| `qf bench export-review / import-review / freeze [--manual FILE] / verify` | 8 | реализованы; порядок — `docs/EVAL_SPEC.md` |
 | `qf eval run`, `qf eval compare` | 9 | не реализованы |
 | `qf eval-baseline` | 10 | не реализована |
 | `qf tokens audit` | 11 | не реализована |

@@ -3,6 +3,22 @@
 Other packages import from here, never from submodules.
 """
 
+from qf.data.benchmark import (
+    VERDICTS,
+    BenchmarkConfig,
+    Candidate,
+    ExportOutcome,
+    FreezeOutcome,
+    ReviewResult,
+    SliceConfig,
+    export_review,
+    freeze,
+    import_review,
+    import_review_stage,
+    read_verdicts,
+    select_candidates,
+    verify_benchmark,
+)
 from qf.data.city_map import CityMap, load_city_map
 from qf.data.facts import (
     CARGO_CATEGORIES,
@@ -43,6 +59,7 @@ from qf.data.generate import (
     render_record,
     sample_loads,
 )
+from qf.data.manual_cases import ManualCase, load_manual_cases
 from qf.data.profile import (
     CHECKS,
     CheckResult,
@@ -94,6 +111,22 @@ from qf.data.validate import (
 )
 
 __all__ = [
+    "load_manual_cases",
+    "ManualCase",
+    "verify_benchmark",
+    "select_candidates",
+    "read_verdicts",
+    "import_review_stage",
+    "import_review",
+    "freeze",
+    "export_review",
+    "SliceConfig",
+    "ReviewResult",
+    "FreezeOutcome",
+    "ExportOutcome",
+    "Candidate",
+    "BenchmarkConfig",
+    "VERDICTS",
     "validate_dataset",
     "run_validation",
     "normalized_request",

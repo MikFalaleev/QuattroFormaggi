@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qf import __version__
-from qf.cli.commands import data, doctor
+from qf.cli.commands import bench, data, doctor
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
 __all__ = ["COMMANDS", "EXIT_ERROR", "EXIT_NOT_IMPLEMENTED", "EXIT_OK", "CommandSpec", "main"]
@@ -79,10 +79,34 @@ _SPECS = (
         data.run_validate,
         data.configure_validate,
     ),
-    CommandSpec("bench export-review", "8", "export benchmark for human review"),
-    CommandSpec("bench import-review", "8", "import human review verdicts"),
-    CommandSpec("bench freeze", "8", "freeze the reviewed benchmark"),
-    CommandSpec("bench verify", "8", "verify the frozen benchmark hash"),
+    CommandSpec(
+        "bench export-review",
+        "8",
+        "export benchmark for human review",
+        bench.run_export,
+        bench.configure,
+    ),
+    CommandSpec(
+        "bench import-review",
+        "8",
+        "import human review verdicts",
+        bench.run_import,
+        bench.configure_import,
+    ),
+    CommandSpec(
+        "bench freeze",
+        "8",
+        "freeze the reviewed benchmark",
+        bench.run_freeze,
+        bench.configure_freeze,
+    ),
+    CommandSpec(
+        "bench verify",
+        "8",
+        "verify the frozen benchmark hash",
+        bench.run_verify,
+        bench.configure,
+    ),
     CommandSpec("eval run", "9", "run an evaluation from a config"),
     CommandSpec("eval compare", "9", "paired comparison of two eval runs"),
     CommandSpec("eval-baseline", "10", "baseline of the base model in LM Studio"),

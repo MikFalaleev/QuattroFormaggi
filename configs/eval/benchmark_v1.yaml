@@ -1,0 +1,18 @@
+# Step 8: the frozen benchmark bench_v1 (IMPLEMENTATION_PLAN.md step 8, docs/EVAL_SPEC.md).
+# Candidates come from the verified test / test_ood files; each slice gets `count` main
+# candidates plus `reserve` spare ones (used only if a main one is dropped in review).
+version: bench_v1
+seed: 42
+source_dir: data/processed/generated_v1   # never changed by the benchmark
+out_dir: data/splits                      # bench_v1.jsonl + .sha256 and the splits without it
+review_csv: configs/eval/bench_v1_review.csv   # human verdicts, kept in Git
+slices:
+  - {name: clean_id, count: 50, splits: [test], kind: clean, stratify_by: [template_family, language]}
+  - {name: clean_ood, count: 30, splits: [test_ood], kind: clean, stratify_by: [ood_reason]}
+  - {name: missing_fields, count: 60, splits: [test, test_ood], kind: dropped_fields, stratify_by: [language]}
+  - {name: per_piece_weight, count: 8, reserve: 2, splits: [test, test_ood], kind: per_piece_weight}
+  - {name: conflict_weight, count: 8, reserve: 2, splits: [test, test_ood], kind: conflict_weight}
+  - {name: conflict_pieces, count: 8, reserve: 2, splits: [test, test_ood], kind: conflict_pieces}
+  - {name: relative_date, count: 8, reserve: 2, splits: [test, test_ood], kind: relative_date}
+  - {name: distractor_numbers, count: 8, reserve: 2, splits: [test, test_ood], kind: distractor_numbers}
+  - {name: city_lang_switch, count: 8, reserve: 2, splits: [test, test_ood], kind: city_lang_switch}
