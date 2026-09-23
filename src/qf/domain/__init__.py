@@ -7,9 +7,11 @@ import from here, never from submodules.
 from qf.domain.geo import CITIES, CityInfo, canonical_place
 from qf.domain.record_checks import check_record
 from qf.domain.rules import (
+    DEFAULT_PIECES,
     REQUIRED_ORDER,
     check_target_consistency,
     compute_missing_fields,
+    effective_pieces,
     total_weight_kg,
 )
 from qf.domain.serialization import (
@@ -31,6 +33,7 @@ from qf.domain.units import (
 
 __all__ = [
     "CITIES",
+    "DEFAULT_PIECES",
     "LB_TO_KG",
     "REQUIRED_ORDER",
     "SHIPMENT_EXTRACTION",
@@ -43,6 +46,7 @@ __all__ = [
     "check_record",
     "check_target_consistency",
     "compute_missing_fields",
+    "effective_pieces",
     "format_kg",
     "from_kg",
     "get_task",

@@ -1,4 +1,4 @@
-"""The missing-fields rule and consistency of an answer (plan B.3, D-042).
+"""The missing-fields rule, default pieces and consistency of an answer (plan B.3, D-042, D-050).
 
 `missing_fields` is computed only by `compute_missing_fields`, never by an LLM or a person.
 """
@@ -11,9 +11,11 @@ from qf.contracts import ExtractionTarget, FieldName, ShipmentCard
 from qf.domain.units import to_kg
 
 __all__ = [
+    "DEFAULT_PIECES",
     "REQUIRED_ORDER",
     "check_target_consistency",
     "compute_missing_fields",
+    "effective_pieces",
     "total_weight_kg",
 ]
 
@@ -26,12 +28,16 @@ REQUIRED_ORDER: Final[tuple[FieldName, ...]] = (
     "weight_total",
     "temperature_c",
 )
+DEFAULT_PIECES: Final = 1
+"""Pieces assumed when the request does not state them (user decision, D-050). The card keeps
+null and `pieces` stays in missing_fields, so the user is still asked to confirm."""
 
 
 def compute_missing_fields(card: ShipmentCard) -> list[FieldName]:
     """Required fields that are null, in `REQUIRED_ORDER`.
 
-    - origin, destination, pickup_date, equipment_type, pieces are always required;
+    - origin, destination, pickup_date, equipment_type, pieces are always required (for
+      unstated pieces code assumes DEFAULT_PIECES, but they are still reported as missing);
     - weight_total is missing only if neither weight_total nor weight_per_piece is given
       (per-piece weight without pieces reports only `pieces`);
     - temperature_c is required only for a reefer;
@@ -49,12 +55,21 @@ def compute_missing_fields(card: ShipmentCard) -> list[FieldName]:
     return [name for name in REQUIRED_ORDER if absent[name]]
 
 
+def effective_pieces(card: ShipmentCard) -> int:
+    """Pieces to compute with: the stated number, else DEFAULT_PIECES."""
+    return card.pieces if card.pieces is not None else DEFAULT_PIECES
+
+
 def total_weight_kg(card: ShipmentCard) -> float | None:
-    """Total mass in kg: weight_total, else weight_per_piece x pieces, else None."""
+    """Total mass in kg: weight_total, else weight_per_piece x effective pieces, else None.
+
+    If the card has no pieces the result assumes DEFAULT_PIECES; `pieces` is then in
+    missing_fields, so callers must show the total as provisional.
+    """
     if card.weight_total is not None:
         return to_kg(card.weight_total)
-    if card.weight_per_piece is not None and card.pieces is not None:
-        return to_kg(card.weight_per_piece) * card.pieces
+    if card.weight_per_piece is not None:
+        return to_kg(card.weight_per_piece) * effective_pieces(card)
     return None
 
 

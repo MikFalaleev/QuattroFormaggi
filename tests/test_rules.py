@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from qf.contracts import Conflict, Quantity, ShipmentCard
 from qf.domain import (
+    DEFAULT_PIECES,
     REQUIRED_ORDER,
     check_target_consistency,
     compute_missing_fields,
+    effective_pieces,
     total_weight_kg,
 )
 from tests.factories import make_card, make_target
@@ -57,7 +59,7 @@ def test_total_weight_kg() -> None:
     assert total_weight_kg(make_card()) == 12592.0
     per_piece = make_card(weight_total=None, weight_per_piece=Quantity(value=572, unit="kg"))
     assert total_weight_kg(per_piece) == 572 * 22
-    assert total_weight_kg(per_piece.model_copy(update={"pieces": None})) is None
+    assert total_weight_kg(per_piece.model_copy(update={"pieces": None})) == 572.0  # 1 place
     assert total_weight_kg(make_card(weight_total=None)) is None
 
 
@@ -94,3 +96,12 @@ def test_both_weights_set_is_inconsistent() -> None:
     assert check_target_consistency(make_target(card)) == [
         "weight_total and weight_per_piece are both set; card_v1 uses one"
     ]
+
+
+def test_unstated_pieces_default_to_one_but_are_still_asked() -> None:
+    card = make_card(pieces=None)
+    assert DEFAULT_PIECES == 1
+    assert effective_pieces(card) == 1
+    assert effective_pieces(make_card(pieces=22)) == 22
+    assert compute_missing_fields(card) == ["pieces"]
+    assert card.pieces is None  # the card keeps what the text says; the default is code's
