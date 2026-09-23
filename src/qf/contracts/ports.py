@@ -12,12 +12,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
+from random import Random
 from typing import Protocol, runtime_checkable
 
 from qf.common import ArtifactRef
 from qf.contracts.facts import LoadFacts
+from qf.contracts.records import Language
+from qf.contracts.rendering import RenderedRequest, RequestDraft
 
-__all__ = ["FactsBuilder", "RawSource"]
+__all__ = ["FactsBuilder", "HardCase", "RawSource", "TemplateFamily"]
 
 
 @runtime_checkable
@@ -51,4 +54,37 @@ class FactsBuilder(Protocol):
     def inputs(self, root: Path) -> dict[str, str]:
         """Files besides the raw artifact that `build` reads (path relative to `root` ->
         sha256), recorded in the run manifest; empty if there are none."""
+        ...
+
+
+@runtime_checkable
+class TemplateFamily(Protocol):
+    """A style of request text in one language (step 6). `ood_only` families are rendered only
+    into test_ood/bench."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def language(self) -> Language: ...
+
+    @property
+    def ood_only(self) -> bool: ...
+
+    def render(self, facts: LoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest:
+        """Text of the draft for `facts`, its evidence and the gold answer built from it."""
+        ...
+
+
+@runtime_checkable
+class HardCase(Protocol):
+    """A controlled difficulty applied to a draft before rendering (step 6)."""
+
+    @property
+    def name(self) -> str: ...
+
+    def applicable(self, facts: LoadFacts) -> bool: ...
+
+    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+        """A new draft with the difficulty added; the input draft is not changed."""
         ...

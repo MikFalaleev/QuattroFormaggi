@@ -11,6 +11,7 @@ from qf.domain import (
     from_kg,
     normalize_number,
     render_value_from_lbs,
+    render_value_per_piece,
     to_kg,
 )
 
@@ -76,3 +77,14 @@ def test_normalize_number() -> None:
         normalize_number(float("inf"))
     with pytest.raises(TypeError):
         normalize_number(True)
+
+
+def test_render_value_per_piece() -> None:
+    assert render_value_per_piece(27761, 22, "kg") == 572  # 12592.19 / 22 = 572.37
+    assert render_value_per_piece(27761, 22, "t") == 0.6
+    assert render_value_per_piece(27761, 22, "lb") == 1262  # 1261.86
+    assert render_value_per_piece(27761, 1, "t") == render_value_from_lbs(27761, "t")
+    with pytest.raises(ValueError, match="pieces must be a positive integer"):
+        render_value_per_piece(27761, 0, "kg")
+    with pytest.raises(ValueError, match="rounds to zero"):
+        render_value_per_piece(100, 28, "t")

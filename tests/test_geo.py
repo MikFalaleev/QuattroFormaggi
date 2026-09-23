@@ -5,7 +5,7 @@ import re
 import pytest
 
 from qf.contracts import Place
-from qf.domain import CITIES, canonical_place
+from qf.domain import CITIES, canonical_place, great_circle_km
 from tests.conftest import REPO_ROOT
 
 CYRILLIC_NAME = r"[А-ЯЁ][а-яё]+(?:[- ](?:на-)?[А-ЯЁа-яё][а-яё]+)*"
@@ -71,3 +71,11 @@ def test_data_spec_city_table_matches_cities() -> None:
         city: (info.region, info.name_en, info.region_en, info.genitive, info.accusative)
         for city, info in CITIES.items()
     }
+
+
+def test_great_circle_km() -> None:
+    assert great_circle_km("Москва", "Москва") == 0
+    assert 2780 < great_circle_km("Москва", "Новосибирск") < 2840  # about 2811 km
+    assert great_circle_km("Казань", "Самара") == great_circle_km("Самара", "Казань")
+    with pytest.raises(KeyError):
+        great_circle_km("Moscow", "Казань")

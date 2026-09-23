@@ -1,0 +1,25 @@
+# Step 6: the SFT dataset generator (IMPLEMENTATION_PLAN.md 6.7). Output: data/processed/<dataset_name>/.
+dataset_name: generated_v1
+seed: 42
+task: shipment_extraction
+schema_version: card_v1
+system_prompt_version: system_extract_v1
+language_share: {ru: 0.6, en: 0.4}
+variants_per_load: 1
+pool:                                  # loads per split (stratified sampling)
+  train: 1500
+  val: 150
+  test: 200
+  test_ood: 200                        # three parts: ood_reason route / family / both
+  smoke: 50                            # first 50 train records by id -> smoke.jsonl (split="train")
+mix:                                   # share of records by kind inside every split
+  clean: 0.55
+  dropped_fields: 0.25                 # a hard case name: applied as is
+  hard: 0.20                           # one case drawn uniformly from `hard` (D-055)
+hard: [per_piece_weight, conflict_weight, conflict_pieces, relative_date, distractor_numbers, city_lang_switch]
+weight_unit_share: {kg: 0.6, t: 0.4}   # no pounds (D-049)
+families: [T1, T2, T3, T4, T5, T6, T7, T8]   # names in TEMPLATE_FAMILIES
+ood:
+  holdout_route_count: 6               # plus the reverse direction of each (D-055)
+  holdout_families: [T7, T8]           # must equal the ood_only families
+stratify_by: [equipment_type, load_month, route_id]

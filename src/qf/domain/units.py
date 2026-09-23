@@ -18,6 +18,7 @@ __all__ = [
     "from_kg",
     "normalize_number",
     "render_value_from_lbs",
+    "render_value_per_piece",
     "to_kg",
 ]
 
@@ -60,15 +61,25 @@ def render_value_from_lbs(lbs: int, unit: WeightUnit) -> int | float:
     half-up on the exact decimal product, so the result never depends on float error.
     The gold answer takes this rendered value, not the source pounds.
     """
-    if isinstance(lbs, bool) or not isinstance(lbs, int) or lbs <= 0:
-        raise ValueError(f"lbs must be a positive integer, got {lbs!r}")
+    return render_value_per_piece(lbs, 1, unit)
+
+
+def render_value_per_piece(lbs: int, pieces: int, unit: WeightUnit) -> int | float:
+    """The number written for the mass of one of `pieces` equal pieces of `lbs` pounds in total.
+
+    Same rounding rules as `render_value_from_lbs` (which is the case `pieces == 1`).
+    """
+    for name, value in (("lbs", lbs), ("pieces", pieces)):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer, got {value!r}")
     if unit == "lb":
-        return lbs
-    kg = Decimal(lbs) * _LB_TO_KG_EXACT
-    if unit == "kg":
-        value = kg.quantize(Decimal(1), rounding=ROUND_HALF_UP)
+        rounded = (Decimal(lbs) / pieces).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    elif unit == "kg":
+        kg = Decimal(lbs) * _LB_TO_KG_EXACT / pieces
+        rounded = kg.quantize(Decimal(1), rounding=ROUND_HALF_UP)
     else:
-        value = (kg / 1000).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-    if value <= 0:
-        raise ValueError(f"{lbs} lb rounds to zero in '{unit}'")
-    return normalize_number(float(value))
+        tonnes = Decimal(lbs) * _LB_TO_KG_EXACT / pieces / 1000
+        rounded = tonnes.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    if rounded <= 0:
+        raise ValueError(f"{lbs} lb / {pieces} rounds to zero in '{unit}'")
+    return normalize_number(float(rounded))

@@ -286,6 +286,21 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 |---|---|---|---|---|---|
 | `RawSource` | `RAW_SOURCES` (`qf.data`, kind `raw_source`) | `hf_dataset` | `qf.data.fetch:HFDatasetSource` | 2 | нет (лёгкая: `huggingface_hub` — core-зависимость) |
 | `FactsBuilder` | `FACTS_BUILDERS` (`qf.data`, kind `facts_builder`) | `logistics_operations_v1` | `qf.data.facts:LogisticsOpsFactsBuilder` | 5 | нет (лёгкая: pandas) |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T1` (RU, деловое письмо) | `qf.data.render.families_ru:BusinessLetterRu` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T2` (RU, мессенджер) | `qf.data.render.families_ru:MessengerRu` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T3` (RU, список «поле: значение») | `qf.data.render.families_ru:ListRu` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T4` (EN, formal email) | `qf.data.render.families_en:FormalEmailEn` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T5` (EN, chat) | `qf.data.render.families_en:ChatEn` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T6` (EN, key: value) | `qf.data.render.families_en:KeyValueEn` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T7` (RU, сленг; только test_ood/bench) | `qf.data.render.families_ru:SlangRu` | 6 | нет |
+| `TemplateFamily` | `TEMPLATE_FAMILIES` (`qf.data`, kind `template_family`) | `T8` (EN, длинное письмо; только test_ood/bench) | `qf.data.render.families_en:LongEmailEn` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `dropped_fields` | `qf.data.render.hard_cases:DroppedFields` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `per_piece_weight` | `qf.data.render.hard_cases:PerPieceWeight` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `conflict_weight` | `qf.data.render.hard_cases:ConflictWeight` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `conflict_pieces` | `qf.data.render.hard_cases:ConflictPieces` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `relative_date` | `qf.data.render.hard_cases:RelativeDate` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `distractor_numbers` | `qf.data.render.hard_cases:DistractorNumbers` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `city_lang_switch` | `qf.data.render.hard_cases:CityLangSwitch` | 6 | нет |
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
@@ -311,3 +326,10 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Порт `FactsBuilder` шире строки таблицы C.4: `build(raw, root)` и `inputs(root) -> dict[str, str]` — файлы, которые сборщик читает помимо сырого артефакта, с sha256 для манифеста запуска (D-052). `LoadFacts` — строгая модель `ContractModel`, а не dataclass (D-051). Стадия фактов запускается отдельной командой `qf data facts` (D-053).
 - Разворот событий Pickup/Delivery по загрузке (`pickup_delivery_by_load`) лежит в `qf/data/raw_tables.py` и общий для `profile` и `facts` (D-054).
+
+## Реализация на шаге 6: отличия от текста Части C
+
+- Порты `TemplateFamily` и `HardCase` объявляют `name`, `language`, `ood_only` как свойства только для чтения (`@property`), а не изменяемые атрибуты: иначе mypy не считает класс с `language = "ru"` реализацией порта (D-058).
+- Реестры `TEMPLATE_FAMILIES` и `HARD_CASES` лежат в `qf/data/registries.py`; пакет `qf.data.render` регистрирует T1–T8 и 7 трудных случаев при импорте (его импортирует `qf.data`).
+- Семейства — наследники `LayoutFamily` (`render/base.py`): только слоты-предложения и их порядки; раскладку с проверкой «каждое поле размещено ровно один раз» и сборку эталона из evidence выполняет общий код. Новое семейство = класс со слотами + регистрация + строка в конфиге; контрактный тест проверит его автоматически.
+- `qf data build` = стадия фактов (шаг 5) + стадия генерации; две записи `run_manifest.json`.

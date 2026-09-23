@@ -15,21 +15,27 @@ from qf.data import (
     RAW_SOURCES,
     Expectations,
     FactsFileConfig,
+    GenerateConfig,
     SourceFileConfig,
     build_facts_artifact,
     fetch_raw_dataset,
+    generate_dataset,
     profile_raw_dataset,
     raw_dataset_path,
+    read_provenance,
     verify_raw_dataset,
 )
 
 __all__ = [
     "DEFAULT_EXPECTATIONS",
     "DEFAULT_FACTS_CONFIG",
+    "DEFAULT_GENERATE_CONFIG",
     "DEFAULT_SOURCE_CONFIG",
+    "configure_build",
     "configure_facts",
     "configure_fetch",
     "configure_profile",
+    "run_build",
     "run_facts",
     "run_fetch",
     "run_profile",
@@ -38,6 +44,7 @@ __all__ = [
 DEFAULT_SOURCE_CONFIG = CONFIGS / "data" / "source.yaml"
 DEFAULT_EXPECTATIONS = CONFIGS / "data" / "expectations.yaml"
 DEFAULT_FACTS_CONFIG = CONFIGS / "data" / "facts.yaml"
+DEFAULT_GENERATE_CONFIG = CONFIGS / "data" / "generate_v1.yaml"
 
 
 def _add_source_config(parser: argparse.ArgumentParser, flag: str) -> None:
@@ -133,10 +140,10 @@ def configure_facts(parser: argparse.ArgumentParser) -> None:
     _add_source_config(parser, "--source-config")
 
 
-def run_facts(args: argparse.Namespace) -> int:
-    root = project_root()
-    source, _ = _load_source(root, args.source_config)
-    file_config = load_yaml_config(args.config or root / DEFAULT_FACTS_CONFIG, FactsFileConfig)
+def _build_facts(root: Path, facts_config: Path | None, source_config: Path | None) -> Path:
+    """The facts stage (step 5); returns the path of the load_facts artifact."""
+    source, _ = _load_source(root, source_config)
+    file_config = load_yaml_config(facts_config or root / DEFAULT_FACTS_CONFIG, FactsFileConfig)
     result = build_facts_artifact(
         build(FACTS_BUILDERS, file_config.builder),
         raw_dataset_path(source, root),
@@ -145,5 +152,48 @@ def run_facts(args: argparse.Namespace) -> int:
         config=file_config.model_dump(mode="json"),
     )
     print(f"Built {result.count} load facts: {result.ref.path} (sha256 {result.ref.sha256[:12]})")
+    print(f"Run manifest: {result.run_dir}")
+    return root / result.ref.path
+
+
+def run_facts(args: argparse.Namespace) -> int:
+    _build_facts(project_root(), args.config, args.source_config)
+    return 0
+
+
+def configure_build(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=f"generator config (default: <project>/{DEFAULT_GENERATE_CONFIG})",
+    )
+    parser.add_argument(
+        "--facts-config",
+        type=Path,
+        default=None,
+        help=f"facts builder config (default: <project>/{DEFAULT_FACTS_CONFIG})",
+    )
+    _add_source_config(parser, "--source-config")
+
+
+def run_build(args: argparse.Namespace) -> int:
+    """Facts (step 5), then the SFT records generated from them (step 6)."""
+    root = project_root()
+    facts_path = _build_facts(root, args.facts_config, args.source_config)
+    source, _ = _load_source(root, args.source_config)
+    provenance = read_provenance(raw_dataset_path(source, root))
+    config_path = args.config or root / DEFAULT_GENERATE_CONFIG
+    cfg = load_yaml_config(config_path, GenerateConfig)
+    result = generate_dataset(
+        facts_path,
+        cfg,
+        root=root,
+        out_dir=root / DATA_PROCESSED / cfg.dataset_name,
+        source_prefix=f"{provenance.repo_id}@{provenance.revision[:12]}",
+        config_path=config_path,
+    )
+    for name, ref in result.refs.items():
+        print(f"{name}: {result.counts[name]} records -> {ref.path} (sha256 {ref.sha256[:12]})")
     print(f"Run manifest: {result.run_dir}")
     return 0

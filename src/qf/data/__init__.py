@@ -32,6 +32,17 @@ from qf.data.fetch import (
     verify_raw_dataset,
     write_provenance,
 )
+from qf.data.generate import (
+    GenerateConfig,
+    GeneratedRecord,
+    GenerateResult,
+    SamplePlan,
+    generate_dataset,
+    generate_record,
+    generate_records,
+    render_record,
+    sample_loads,
+)
 from qf.data.profile import (
     CHECKS,
     CheckResult,
@@ -48,9 +59,20 @@ from qf.data.raw_tables import (
     load_raw_tables,
     pickup_delivery_by_load,
 )
-from qf.data.registries import FACTS_BUILDERS, RAW_SOURCES
+from qf.data.registries import FACTS_BUILDERS, HARD_CASES, RAW_SOURCES, TEMPLATE_FAMILIES
 
 __all__ = [
+    "render_record",
+    "GeneratedRecord",
+    "sample_loads",
+    "generate_records",
+    "generate_record",
+    "generate_dataset",
+    "TEMPLATE_FAMILIES",
+    "SamplePlan",
+    "HARD_CASES",
+    "GenerateResult",
+    "GenerateConfig",
     "save_facts",
     "pickup_delivery_by_load",
     "load_facts",

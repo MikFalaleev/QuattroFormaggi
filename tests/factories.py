@@ -74,6 +74,7 @@ def make_record(answer: str | None = None, **overrides: Any) -> SFTRecord:
             request_date=date(2021, 12, 28),
             date_style="iso",
             city_lang="ru",
+            ood_reason=None,
         ),
         "schema_version": "card_v1",
         "split": "train",

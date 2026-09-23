@@ -20,6 +20,7 @@ __all__ = [
     "SFT_RECORD_SCHEMA_VERSION",
     "HardCaseName",
     "Language",
+    "OodReason",
     "SFTRecord",
     "SplitName",
     "TargetSchemaVersion",
@@ -38,6 +39,8 @@ TargetSchemaVersion = Literal["card_v1"]
 """Answer schemas a record may use. A new schema widens this Literal; old records stay valid."""
 Language = Literal["ru", "en"]
 SplitName = Literal["train", "val", "test", "test_ood", "bench"]
+OodReason = Literal["route", "family", "both"]
+"""Why a test_ood record is out of distribution: held-out route, held-out template family, both."""
 
 
 class VariantInfo(ContractModel):
@@ -50,6 +53,7 @@ class VariantInfo(ContractModel):
     request_date: date
     date_style: Literal["iso", "text", "relative"]
     city_lang: Language
+    ood_reason: OodReason | None
 
 
 class SFTRecord(ContractModel):

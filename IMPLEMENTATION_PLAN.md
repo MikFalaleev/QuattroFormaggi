@@ -987,6 +987,8 @@ tests/contracts/test_template_family_contract.py
 tests/test_generate_determinism.py
 ```
 
+**Реализовано (D-055…D-060):** реестры семейств и трудных случаев — в `qf/data/registries.py`, словари — `render/vocabulary.py`; один трудный случай на запись, `hard` — равномерно из списка `hard` конфига; отложенные маршруты — вместе с обратным направлением; ставка в отвлекающих числах — случайная; второе значение конфликта подаётся нейтрально, а не «Уточнение»; `render_record` отдаёт запись вместе с планом и рендером для контрактных тестов. Подробности — `docs/DATA_SPEC.md`, раздел «Генератор заявок».
+
 **6.1. Системный промпт `system_extract_v1.txt`** (на русском, не длиннее примерно 350 токенов). Содержание:
 
 - роль;
@@ -1199,7 +1201,7 @@ CLI: `qf data build [--config configs/data/generate_v1.yaml]`. Первый эт
   - `NOT_CANONICAL` — ответ не в канонической сериализации;
   - `GROUP_LEAK` — `group_id` встречается более чем в одном сплите;
   - `DUP_EXACT` — нормализованный текст user (lower, схлопнутые пробелы, без даты запроса) совпадает между разными сплитами. Внутри одного сплита — предупреждение;
-  - `OOD_ROUTE_LEAK` — маршрут из holdout встречается в train/val/test;
+  - `OOD_ROUTE_LEAK` — маршрут из holdout встречается в train/val/test. Список отложенных маршрутов — в `extra.holdout_routes` манифеста каждого файла выборки (шаг 6, D-055); маршрут записи — из родительского артефакта `load_facts` по `load_id` (`group_id = "load:<load_id>"`);
   - `OOD_FAMILY_LEAK` — T7/T8 в train/val/test;
   - `BENCH_LEAK` — `id`, `group_id` или нормализованный текст benchmark встречается в train/val;
   - `EMPTY_ASSISTANT`;

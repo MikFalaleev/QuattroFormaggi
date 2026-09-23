@@ -17,21 +17,29 @@ from qf.contracts.card_v1 import (
 )
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
-from qf.contracts.ports import FactsBuilder, RawSource
+from qf.contracts.ports import FactsBuilder, HardCase, RawSource, TemplateFamily
 from qf.contracts.records import (
     RECORD_ROLES,
     SFT_RECORD_SCHEMA_VERSION,
     HardCaseName,
     Language,
+    OodReason,
     SFTRecord,
     SplitName,
     TargetSchemaVersion,
     TaskName,
     VariantInfo,
 )
+from qf.contracts.rendering import RenderedField, RenderedRequest, RequestDraft
 from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, supported_versions
 
 __all__ = [
+    "TemplateFamily",
+    "RequestDraft",
+    "RenderedRequest",
+    "RenderedField",
+    "OodReason",
+    "HardCase",
     "CARD_SCHEMA_VERSION",
     "LOAD_FACTS_SCHEMA_VERSION",
     "RECORD_ROLES",

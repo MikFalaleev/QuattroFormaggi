@@ -5,9 +5,9 @@
 - **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: запрос на перевозку → JSON-карточка груза (`card_v1`) + список недостающих полей; экспорт в GGUF для LM Studio.
 - **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля.
 
-Статус: реализованы **шаги 1–5** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`). Обучения и весов пока нет.
+Статус: реализованы **шаги 1–6** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`). Обучения и весов пока нет.
 
-Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `AGENTS.md` (правила для coding agents).
+Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TODO.md` (отложенные задачи и напоминания), `AGENTS.md` (правила для coding agents).
 
 ## Быстрый старт
 
@@ -21,6 +21,7 @@ uv run qf data fetch       # скачать закреплённую ревиз�
 uv run qf data fetch --verify-only   # проверить скачанные файлы по provenance.json
 uv run qf data profile     # 10 проверок целостности → data/processed/profile_report.{json,md}
 uv run qf data facts       # факты о 85 410 загрузках с российскими городами → data/processed/load_facts.jsonl
+uv run qf data build       # факты + 2 050 учебных записей → data/processed/generated_v1/*.jsonl
 ```
 
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); QLoRA-обучение — удалённая машина Linux + NVIDIA (≥24 GB VRAM). См. `docs/PROJECT.md`, раздел 4.
@@ -33,7 +34,7 @@ uv run qf data facts       # факты о 85 410 загрузках с росс
 | `qf data fetch [--config PATH] [--verify-only]` | 2 | реализована |
 | `qf data profile [--source-config PATH] [--expectations PATH]` | 3 | реализована |
 | `qf data facts [--config PATH] [--source-config PATH]` | 5 | реализована |
-| `qf data build` | 6 | не реализована (код выхода 2) |
+| `qf data build [--config PATH] [--facts-config PATH] [--source-config PATH]` | 6 | реализована |
 | `qf data split`, `qf data report`, `qf validate-data` | 7 | не реализованы |
 | `qf bench export-review / import-review / freeze / verify` | 8 | не реализованы |
 | `qf eval run`, `qf eval compare` | 9 | не реализованы |

@@ -10,6 +10,7 @@ are written by hand. Which source (US) city becomes which of these is data, not 
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -17,7 +18,10 @@ from typing import Final
 
 from qf.contracts import Place
 
-__all__ = ["CITIES", "CityInfo", "canonical_place"]
+__all__ = ["CITIES", "EARTH_RADIUS_KM", "CityInfo", "canonical_place", "great_circle_km"]
+
+
+EARTH_RADIUS_KM: Final = 6371.0
 
 
 @dataclass(frozen=True)
@@ -112,3 +116,12 @@ def canonical_place(city: str) -> Place:
     if info is None:
         raise KeyError(f"unknown city {city!r}")
     return Place(city=city, region=info.region)
+
+
+def great_circle_km(a: str, b: str) -> float:
+    """Distance between two catalog cities along the Earth's surface (not a road distance)."""
+    first, second = CITIES[a], CITIES[b]
+    lat1, lat2 = math.radians(first.lat), math.radians(second.lat)
+    dlon = math.radians(second.lon - first.lon)
+    cos = math.sin(lat1) * math.sin(lat2) + math.cos(lat1) * math.cos(lat2) * math.cos(dlon)
+    return EARTH_RADIUS_KM * math.acos(max(-1.0, min(1.0, cos)))

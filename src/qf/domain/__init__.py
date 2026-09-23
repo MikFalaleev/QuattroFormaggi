@@ -4,7 +4,14 @@ Depends only on `qf.contracts` and `qf.common`; no I/O and no heavy libraries. O
 import from here, never from submodules.
 """
 
-from qf.domain.geo import CITIES, CityInfo, canonical_place
+from qf.domain.geo import CITIES, EARTH_RADIUS_KM, CityInfo, canonical_place, great_circle_km
+from qf.domain.prompting import (
+    DEFAULT_PROMPT_VERSION,
+    REQUEST_DATE_LABELS,
+    build_messages,
+    load_system_prompt,
+    system_prompt_hash,
+)
 from qf.domain.record_checks import check_record
 from qf.domain.rules import (
     DEFAULT_PIECES,
@@ -28,10 +35,19 @@ from qf.domain.units import (
     from_kg,
     normalize_number,
     render_value_from_lbs,
+    render_value_per_piece,
     to_kg,
 )
 
 __all__ = [
+    "system_prompt_hash",
+    "render_value_per_piece",
+    "load_system_prompt",
+    "great_circle_km",
+    "build_messages",
+    "REQUEST_DATE_LABELS",
+    "EARTH_RADIUS_KM",
+    "DEFAULT_PROMPT_VERSION",
     "CITIES",
     "DEFAULT_PIECES",
     "LB_TO_KG",
