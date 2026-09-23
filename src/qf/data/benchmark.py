@@ -37,6 +37,7 @@ from qf.data.sft_io import DATASET_FILES, read_sft_records, write_sft_records
 from qf.domain import check_record, parse_target
 
 __all__ = [
+    "BENCH_SCHEMAS",
     "VERDICTS",
     "BenchmarkConfig",
     "Candidate",
@@ -53,6 +54,8 @@ __all__ = [
     "verify_benchmark",
 ]
 
+BENCH_SCHEMAS: Final = ("card_v1",)
+"""Answer schemas this stage selects, reviews and freezes; card_v2 is added in sub-step V5."""
 VERDICTS: Final = ("ok", "fix", "drop")
 CSV_COLUMNS: Final = ("n", "id", "slice", "role", "verdict", "comment")
 Stratum = Literal["template_family", "language", "ood_reason"]
@@ -277,6 +280,10 @@ def _read(path: Path, root: Path) -> tuple[ArtifactRef, list[SFTRecord]]:
     records, issues = read_sft_records(root / ref.path)
     if issues:
         raise DataValidationError(issues)
+    other = sorted({r.schema_version for r in records} - set(BENCH_SCHEMAS))
+    if other:
+        raise QFError(f"{ref.path}: records in {', '.join(other)} cannot be put in a benchmark "
+                      "yet; card_v2 benchmarks arrive in sub-step V5 (D-089)")  # fmt: skip
     return ref, records
 
 

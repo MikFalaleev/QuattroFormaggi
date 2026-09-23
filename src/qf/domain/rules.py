@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from qf.contracts import ExtractionTarget, FieldName, ShipmentCard
+from qf.contracts import ExtractionTarget, FieldName, ShipmentCard, ShipmentCardV2
 from qf.domain.units import to_kg
 
 __all__ = [
@@ -55,12 +55,12 @@ def compute_missing_fields(card: ShipmentCard) -> list[FieldName]:
     return [name for name in REQUIRED_ORDER if absent[name]]
 
 
-def effective_pieces(card: ShipmentCard) -> int:
+def effective_pieces(card: ShipmentCard | ShipmentCardV2) -> int:
     """Pieces to compute with: the stated number, else DEFAULT_PIECES."""
     return card.pieces if card.pieces is not None else DEFAULT_PIECES
 
 
-def total_weight_kg(card: ShipmentCard) -> float | None:
+def total_weight_kg(card: ShipmentCard | ShipmentCardV2) -> float | None:
     """Total mass in kg: weight_total, else weight_per_piece x effective pieces, else None.
 
     If the card has no pieces the result assumes DEFAULT_PIECES; `pieces` is then in

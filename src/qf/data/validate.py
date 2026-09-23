@@ -94,8 +94,9 @@ def _record_issues(name: str, records: Sequence[SFTRecord]) -> list[Issue]:
     issues: list[Issue] = []
     for record in records:
         issues += check_record(record)
-        if record.task in TASKS:
-            version = get_task(record.task).system_prompt_version
+        task = get_task(record.task) if record.task in TASKS else None
+        if task is not None and record.schema_version in task.schema_versions:
+            version = task.prompt_for(record.schema_version)
             if record.messages[0].content != _prompt(version):
                 issues.append(Issue(record.id, name, "PROMPT_MISMATCH",
                                     f"system prompt differs from {version}"))  # fmt: skip

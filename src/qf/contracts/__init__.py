@@ -15,6 +15,30 @@ from qf.contracts.card_v1 import (
     ShipmentCard,
     WeightUnit,
 )
+from qf.contracts.card_v2 import CONDITION_KINDS as CARD_V2_CONDITION_KINDS
+from qf.contracts.card_v2 import SCHEMA_VERSION as CARD_V2_SCHEMA_VERSION
+from qf.contracts.card_v2 import CargoCategory as CargoCategoryV2
+from qf.contracts.card_v2 import (
+    ConditionKind,
+    Length,
+    LengthUnit,
+    OversizeCondition,
+    PackagingCondition,
+    PackagingType,
+    SecuringCondition,
+    SecuringMethod,
+    SensorParameter,
+    SensorsCondition,
+    SpecialCondition,
+    TemperatureCondition,
+)
+from qf.contracts.card_v2 import Conflict as ConflictV2
+from qf.contracts.card_v2 import ConflictField as ConflictFieldV2
+from qf.contracts.card_v2 import EquipmentType as EquipmentTypeV2
+from qf.contracts.card_v2 import ExtractionTarget as ExtractionTargetV2
+from qf.contracts.card_v2 import FieldName as FieldNameV2
+from qf.contracts.card_v2 import MissingField as MissingFieldV2
+from qf.contracts.card_v2 import ShipmentCard as ShipmentCardV2
 from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
@@ -54,6 +78,28 @@ __all__ = [
     "OodReason",
     "HardCase",
     "CARD_SCHEMA_VERSION",
+    "CARD_V2_CONDITION_KINDS",
+    "CARD_V2_SCHEMA_VERSION",
+    "CargoCategoryV2",
+    "ConditionKind",
+    "ConflictFieldV2",
+    "ConflictV2",
+    "EquipmentTypeV2",
+    "ExtractionTargetV2",
+    "FieldNameV2",
+    "Length",
+    "LengthUnit",
+    "MissingFieldV2",
+    "OversizeCondition",
+    "PackagingCondition",
+    "PackagingType",
+    "SecuringCondition",
+    "SecuringMethod",
+    "SensorParameter",
+    "SensorsCondition",
+    "ShipmentCardV2",
+    "SpecialCondition",
+    "TemperatureCondition",
     "LOAD_FACTS_SCHEMA_VERSION",
     "RECORD_ROLES",
     "SFT_RECORD_SCHEMA_VERSION",

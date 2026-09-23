@@ -23,13 +23,13 @@ from qf.contracts import (
 )
 from qf.domain import (
     TargetParseError,
-    check_target_consistency,
+    get_target_schema,
     parse_target,
     parse_target_lenient,
     serialize_target,
 )
 from tests.conftest import REPO_ROOT
-from tests.factories import EXAMPLE_ANSWER, make_card, make_record, make_target
+from tests.factories import EXAMPLE_ANSWER, EXAMPLE_ANSWER_V2, make_card, make_record, make_target
 
 
 def _answer(card_patch: dict[str, Any] | None = None, **top: Any) -> str:
@@ -213,7 +213,7 @@ def test_record_fields_are_validated() -> None:
     assert make_record(split=None).split is None
     for bad in (
         {"task": ""},
-        {"schema_version": "card_v2"},
+        {"schema_version": "card_v9"},
         {"split": "holdout"},
         {"language": "de"},
         {"id": " "},
@@ -240,12 +240,14 @@ def test_data_spec_examples_are_canonical_and_consistent() -> None:
     doc = (REPO_ROOT / "docs" / "DATA_SPEC.md").read_text(encoding="utf-8")
     answers = [block for block in re.findall(r"```json\n(.*?)\n```", doc, re.DOTALL)
                if block.startswith('{"card"')]  # fmt: skip
-    assert len(answers) == 3
-    assert EXAMPLE_ANSWER in answers
+    v2 = [answer for answer in answers if '"special_conditions":' in answer]
+    assert (len(answers) - len(v2), len(v2)) == (3, 2)
+    assert EXAMPLE_ANSWER in answers and EXAMPLE_ANSWER_V2 in v2
     for answer in answers:
-        target = parse_target(answer)
-        assert serialize_target(target) == answer
-        assert check_target_consistency(target) == []
+        schema = get_target_schema("card_v2" if answer in v2 else "card_v1")
+        target = schema.parse(answer)
+        assert schema.serialize(target) == answer
+        assert schema.check_consistency(target) == []
 
 
 @pytest.mark.parametrize(

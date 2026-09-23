@@ -17,8 +17,9 @@ from qf.cli import main
 from qf.common import QFError, load_artifact_manifest, read_artifact, write_artifact
 from qf.contracts import SFTRecord, supported_versions
 from qf.data import ValidationReport, run_validation, validate_dataset, write_sft_records
-from qf.domain import parse_target, serialize_target
+from qf.domain import load_system_prompt, parse_target, serialize_target
 from tests.conftest import REPO_ROOT
+from tests.factories import EXAMPLE_ANSWER_V2
 from tests.generation import install_project
 
 DATA = Path("data/processed/generated_v1")
@@ -173,6 +174,23 @@ def test_prompt_mismatch_detected(project: Path) -> None:
         record["messages"][0]["content"] += "\nОтвечай кратко."
 
     record_id = edit_first(project, "test", edit)
+    assert found(validate(project)) == [(record_id, "PROMPT_MISMATCH")]
+
+
+def test_card_v2_record_is_checked_with_its_prompt(project: Path) -> None:
+    """A card_v2 record is checked by the rules of card_v2 and against prompt v2 (D-086)."""
+
+    def to_v2(prompt: str) -> Callable[[dict[str, Any]], None]:
+        def edit(record: dict[str, Any]) -> None:
+            record["schema_version"] = "card_v2"
+            record["messages"][0]["content"] = load_system_prompt(prompt)
+            record["messages"][2]["content"] = EXAMPLE_ANSWER_V2
+
+        return edit
+
+    edit_first(project, "test", to_v2("system_extract_v2"))
+    assert found(validate(project)) == []
+    record_id = edit_first(project, "test", to_v2("system_extract_v1"))
     assert found(validate(project)) == [(record_id, "PROMPT_MISMATCH")]
 
 

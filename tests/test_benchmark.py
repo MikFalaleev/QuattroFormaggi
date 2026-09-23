@@ -21,15 +21,19 @@ from qf.common import (
 )
 from qf.contracts import SFTRecord, supported_versions
 from qf.data import (
+    BENCH_SCHEMAS,
     BenchmarkConfig,
+    export_review,
     generate_dataset,
     load_manual_cases,
     read_sft_records,
     save_facts,
     select_candidates,
     verify_benchmark,
+    write_sft_records,
 )
 from tests.conftest import REPO_ROOT
+from tests.factories import make_record_v2
 from tests.generation import repo_config, synthetic_facts
 
 GENERATED = Path("data/processed/generated_v1")
@@ -141,6 +145,18 @@ def test_export_refuses_to_overwrite_verdicts(
 
 
 # --- review --------------------------------------------------------------------------------
+
+
+def test_card_v2_records_are_refused_before_v5(project: Path) -> None:
+    """The stage selects and freezes card_v1 only (D-089); a card_v2 record is an explicit
+    error, not a parse failure somewhere in the review Markdown."""
+    path = project / GENERATED / "test.jsonl"
+    records, _ = read_sft_records(path)
+    records[0] = make_record_v2(id=records[0].id, group_id=records[0].group_id, split="test")
+    write_sft_records(records, path, run_id="run-x", parents=[], root=project)
+    assert "card_v1" in BENCH_SCHEMAS
+    with pytest.raises(QFError, match="card_v2 cannot be put in a benchmark yet"):
+        export_review(config(project), root=project)
 
 
 def test_import_review_ok_drop_fix(project: Path) -> None:

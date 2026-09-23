@@ -4,6 +4,7 @@ Other packages import from here, never from submodules.
 """
 
 from qf.data.benchmark import (
+    BENCH_SCHEMAS,
     VERDICTS,
     BenchmarkConfig,
     Candidate,
@@ -126,6 +127,7 @@ __all__ = [
     "ExportOutcome",
     "Candidate",
     "BenchmarkConfig",
+    "BENCH_SCHEMAS",
     "VERDICTS",
     "validate_dataset",
     "run_validation",

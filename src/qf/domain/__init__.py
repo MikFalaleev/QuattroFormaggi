@@ -22,14 +22,32 @@ from qf.domain.rules import (
     effective_pieces,
     total_weight_kg,
 )
+from qf.domain.rules_v2 import (
+    BASE_REQUIRED_ORDER_V2,
+    CONDITION_MISSING_NAMES,
+    REQUIRED_CONDITIONS,
+    check_target_consistency_v2,
+    compute_missing_fields_v2,
+    condition_lacks_values,
+    has_special_conditions,
+)
+from qf.domain.schemas import (
+    TARGET_SCHEMAS,
+    TargetSchema,
+    get_target_schema,
+    register_target_schema,
+)
 from qf.domain.serialization import (
     TargetParseError,
     parse_target,
     parse_target_lenient,
+    parse_target_lenient_v2,
+    parse_target_v2,
     serialize_target,
 )
 from qf.domain.tasks import SHIPMENT_EXTRACTION, TASKS, TaskSpec, get_task, register_task
 from qf.domain.units import (
+    CM_TO_M,
     LB_TO_KG,
     T_TO_KG,
     format_kg,
@@ -38,9 +56,25 @@ from qf.domain.units import (
     render_value_from_lbs,
     render_value_per_piece,
     to_kg,
+    to_m,
 )
 
 __all__ = [
+    "BASE_REQUIRED_ORDER_V2",
+    "CM_TO_M",
+    "CONDITION_MISSING_NAMES",
+    "REQUIRED_CONDITIONS",
+    "TARGET_SCHEMAS",
+    "TargetSchema",
+    "check_target_consistency_v2",
+    "compute_missing_fields_v2",
+    "condition_lacks_values",
+    "get_target_schema",
+    "has_special_conditions",
+    "parse_target_lenient_v2",
+    "parse_target_v2",
+    "register_target_schema",
+    "to_m",
     "parse_sft_jsonl",
     "system_prompt_hash",
     "render_value_per_piece",

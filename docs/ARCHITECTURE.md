@@ -302,7 +302,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `distractor_numbers` | `qf.data.render.hard_cases:DistractorNumbers` | 6 | нет |
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `city_lang_switch` | `qf.data.render.hard_cases:CityLangSwitch` | 6 | нет |
 | `Splitter` | `SPLITTERS` (`qf.data`, kind `splitter`) | `group_hash` | `qf.data.split:GroupHashSplitter` | 7 | нет |
-| — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
+| — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (схема ответа → промпт: `card_v1` → `system_extract_v1`, `card_v2` → `system_extract_v2`, D-086) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
+| — (реестр без порта: записи — `TargetSchema`) | `TARGET_SCHEMAS` (`qf.domain`, kind `target_schema`) | `card_v1`, `card_v2` (разбор, запись, правило недостающих полей, согласованность, JSON-схема) | `qf.domain.schemas` | V1 (D-086) | нет |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `fake` (подготовленные ответы по sha256 user-сообщения; не модель) | `qf.backends.fake:FakeBackend` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
@@ -354,4 +355,12 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - `qf.eval` разбит на модули: `metrics/` (разбор одного ответа `case_scoring.py`, реестр, метрики), `stats.py`, `slices.py` (срезы отчёта), `results.py` (`EvalRun` и файлы прогона), `harness.py` (`run_eval`, `compare_stage`), `report.py` (`render_report`, `compare_runs`). `EvalRun` вынесен в `results.py`, чтобы отчёт и harness не импортировали друг друга по кругу.
 - Порт `GenerationBackend`: `name` — свойство только для чтения. Harness ловит исключение backend'а и записывает его как `error` кейса (порт исключений не бросает, но нарушение контракта не должно терять кейс), D-076).
 - `qf eval run` не принимает `--backend fake`: fake-backend выбирается в конфиге (`backend: {name: fake, responses_file: …}`), как любой другой (D-077).
+
+## Реализация подшага V1 (`card_v2`): отличия от текста Части C
+
+- Реестр схем ответа `TARGET_SCHEMAS` лежит в `qf.domain` и содержит только доменную часть: разбор, запись, правило недостающих полей, согласованность, JSON-схему. Сравнение полей и детекторы критических ошибок получат свой реестр по версии схемы в `qf.eval` (подшаг V6), потому что `qf.domain` не может ссылаться на `qf.eval` (D-087).
+- `TaskSpec` связывает каждую схему ответа со своим промптом (`prompts`, `prompt_for(schema)`); `check_record` выбирает правила записи по её `schema_version` через `TARGET_SCHEMAS`, без ветвлений по версии (D-089).
+- `card_v2.py` переиспользует `Place`, `Quantity` и приватную нормализацию чисел конфликтов из `card_v1.py`; сам `card_v1.py` не менялся. Имена v2 экспортируются из `qf.contracts` с суффиксом `V2` (`ShipmentCardV2`, `ExtractionTargetV2`, …), условия — без суффикса (`TemperatureCondition`, …).
+- Harness отказывает для схем вне `SCORED_SCHEMAS` (пока только `card_v1`), чтобы ответы `card_v2` не разбирались правилами v1 (D-089); так же стадия benchmark отказывает для схем вне `BENCH_SCHEMAS` до подшага V5.
+- `upgrade_v1_to_v2()` из C.7 не создаётся: миграция невозможна (`dry_van` — это и `tent`, и `van`; условий в v1 нет), D-087.
 

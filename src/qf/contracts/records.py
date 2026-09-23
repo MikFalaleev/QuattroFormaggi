@@ -35,7 +35,7 @@ TaskName = str
 """Open set: a name is valid if it is registered in `qf.domain.TASKS` (D-040)."""
 HardCaseName = str
 """Open set: a name is valid if it is registered in `qf.data.HARD_CASES` (step 6)."""
-TargetSchemaVersion = Literal["card_v1"]
+TargetSchemaVersion = Literal["card_v1", "card_v2"]
 """Answer schemas a record may use. A new schema widens this Literal; old records stay valid."""
 Language = Literal["ru", "en"]
 SplitName = Literal["train", "val", "test", "test_ood", "bench"]

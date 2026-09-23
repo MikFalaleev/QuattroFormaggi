@@ -52,7 +52,7 @@ from qf.eval import (
     record_kind,
     run_eval,
 )
-from tests.factories import make_card, make_record, make_target
+from tests.factories import make_card, make_record, make_record_v2, make_target
 
 SYSTEM = "system prompt"
 BENCH = Path("data/splits/bench_t.jsonl")
@@ -287,6 +287,14 @@ def test_repeated_record_ids_are_refused(root: Path, bench: Any) -> None:
     with pytest.raises(QFError, match="repeated ids"):
         run_eval([*records, records[0]], FakeBackend.from_answers({}), config(ref), bench=ref,
                  root=root)  # fmt: skip
+
+
+def test_card_v2_answers_are_not_scored_before_v6(root: Path, bench: Any) -> None:
+    ref, _ = bench
+    backend = FakeBackend.from_answers({})
+    with pytest.raises(QFError, match="card_v2 cannot be scored yet"):
+        run_eval([make_record_v2()], backend, config(ref), bench=ref, root=root)
+    assert backend.requests == []
 
 
 def test_mixed_system_prompts_are_refused(root: Path, bench: Any) -> None:

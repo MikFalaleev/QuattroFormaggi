@@ -1455,6 +1455,8 @@ CLI:
 | V5 | шаг 8 | `bench_v2`: срезы по видам условий и типам транспорта, 20–40 настоящих заявок пользователя | Заморожен, sha в `docs/EVAL_SPEC.md` | проверка `bench_v2` пользователем |
 | V6 | шаг 9 | Метрики, критические ошибки (D-085) и отчёт v2; fake-прогон на `bench_v2` | Контрактные тесты метрик v2; прогон на закоммиченном коде | — |
 
+**V1 реализован** (D-087…D-091): контракт `card_v2`, правила, реестр схем `TARGET_SCHEMAS`, задача с парами «схема → промпт», промпт `system_extract_v2`, тест заморозки версии 1 `tests/test_v1_frozen.py`; описание — `docs/DATA_SPEC.md`, раздел «Контракт ответа `card_v2`».
+
 **Риск для шага 10.** Условия — вложенные объекты; constrained decoding в LM Studio (грамматика llama.cpp) должен их выдержать. Схема держится плоской, проверка — на шаге 10.
 
 ---
@@ -1487,7 +1489,7 @@ CLI:
   - `resolve_model(expected_substring: str|None) -> str` — если моделей несколько и подстрока не задана или неоднозначна, ошибка со списком. **Не угадывать по имени файла**;
   - `chat(model, req: GenerationRequest, *, stream=True) -> GenerationResult` — `POST /v1/chat/completions`. При `stream=True` измерять TTFT по первому чанку. `json_schema` → `response_format={"type":"json_schema","json_schema":{"name":"card_v1","schema":…,"strict":true}}`.
   - Ошибки HTTP, таймауты и обрыв потока возвращаются в `GenerationResult.error`. Повторов нет, кроме одного повтора при `ConnectError`. **Никакого fallback на другой URL.**
-- **`card_v1_json_schema() -> dict`** — в `qf/contracts/card_v1.py` (не в backend: backend не знает о карточке, он лишь передаёт `req.json_schema`), из Pydantic (`ExtractionTarget.model_json_schema()`), с упрощением `$defs`, если runtime их не поддерживает. Проверяется тестом.
+- **`card_v1_json_schema() -> dict`** — в `qf/contracts/card_v1.py` (не в backend: backend не знает о карточке, он лишь передаёт `req.json_schema`), из Pydantic (`ExtractionTarget.model_json_schema()`), с упрощением `$defs`, если runtime их не поддерживает. Проверяется тестом. *Уточнено на подшаге V1 (D-087):* схема берётся из реестра — `qf.domain.get_target_schema("card_v2").json_schema()`; отдельная функция в `card_v1.py` не нужна.
 
 - **`class OpenAILocalBackend`** — реализация `GenerationBackend`, регистрируется в `BACKENDS` как `openai_local`; конфиг `{name, base_url, model_substring, timeout_s}`. Подходит и для LM Studio, и для `llama-server` (шаг 17): отличается только `base_url` в конфиге. Будущие Ollama/vLLM — новые реализации рядом (C.9).
 

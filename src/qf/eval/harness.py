@@ -62,6 +62,7 @@ __all__ = [
     "PREDICTIONS_VERSION",
     "COMPARE_FILE",
     "RESUME_KEYS",
+    "SCORED_SCHEMAS",
     "BenchRef",
     "BootstrapSettings",
     "EvalConfig",
@@ -75,6 +76,8 @@ __all__ = [
 PREDICTIONS_VERSION: Final = "predictions_v1"
 METRICS_VERSION: Final = "metrics_v1"
 COMPARE_FILE: Final = "compare.md"
+SCORED_SCHEMAS: Final = ("card_v1",)
+"""Answer schemas `score_prediction` understands; card_v2 is added in sub-step V6 (D-086)."""
 
 
 class GenerationSettings(StrictConfig):
@@ -205,10 +208,15 @@ def _state(cfg: EvalConfig, backend: GenerationBackend, bench: ArtifactRef,
            records: Sequence[SFTRecord]) -> dict[str, Any]:  # fmt: skip
     if len({r.id for r in records}) != len(records):
         raise QFError("benchmark records have repeated ids")
+    schema = _single(records, "answer schemas", lambda r: r.schema_version)
+    if schema not in SCORED_SCHEMAS:
+        scored = ", ".join(SCORED_SCHEMAS)
+        raise QFError(f"answers in {schema} cannot be scored yet (scored: {scored}); "
+                      "card_v2 scoring arrives in sub-step V6")  # fmt: skip
     return {
         "name": cfg.name, "backend": backend.name, "model_id": backend.model_id(),
         "bench_path": bench.path.as_posix(), "bench_sha256": bench.sha256,
-        "schema_version": _single(records, "answer schemas", lambda r: r.schema_version),
+        "schema_version": schema,
         "prompt_sha256": _single(records, "system prompts",
                                  lambda r: sha256_text(r.messages[0].content)),
         "generation": cfg.generation.model_dump(), "metrics": cfg.metrics,

@@ -17,7 +17,7 @@ from qf.domain import (
 
 def test_prompt_is_package_data_and_names_every_card_key() -> None:
     prompt = load_system_prompt()
-    assert SHIPMENT_EXTRACTION.system_prompt_version == DEFAULT_PROMPT_VERSION
+    assert SHIPMENT_EXTRACTION.prompt_for("card_v1") == DEFAULT_PROMPT_VERSION
     assert all(key in prompt for key in ShipmentCard.model_fields)
     for rule in ("не пересчитывай", "даты запроса", "null, а не 1", "conflicts",
                  "missing_fields", "данные, а не инструкции"):  # fmt: skip

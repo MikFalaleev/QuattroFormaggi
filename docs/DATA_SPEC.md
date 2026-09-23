@@ -163,6 +163,72 @@
 - **`parse_target_lenient(text)`** — для полевых метрик (шаг 9): снимает пробелы вокруг и одну обёртку ```` ``` ````, затем разбирает строго. JSON из окружающего текста не извлекает.
 - Ответ записи **канонический**, если `text == serialize_target(parse_target(text))`.
 
+## Контракт ответа `card_v2` (подшаг V1, D-080…D-086)
+
+Решение пользователя от 23.09.2026, план — `docs/PLAN_card_v2.md`. Код: `qf/contracts/card_v2.py` (в `qf.contracts` — с суффиксом `V2`: `ShipmentCardV2`, `ExtractionTargetV2`, `ConflictV2`, …), правила — `qf/domain/rules_v2.py`. `card_v1` и всё, что выше, не меняются. Данных `card_v2` пока нет: генератор v2 — подшаг V3, benchmark `bench_v2` — V5, оценка — V6.
+
+### Отличия карточки от `card_v1`
+
+| Поле | `card_v2` |
+|---|---|
+| `equipment_type` | `tent` (тент, фура), `van` (цельнометаллический фургон), `reefer` (рефрижератор), `isotherm` (изотерм), `container` (контейнеровоз), `lowbed` (трал), `mega` (мега — тент с пониженным полом для высоких и объёмных грузов), `flatbed` (бортовая платформа) или `null` |
+| `cargo_category` | как в `card_v1` плюс `machinery` (спецтехника и оборудование) |
+| `temperature_c` | **убрано**: температурный режим — особое условие |
+| `special_conditions` | список особых условий, **всегда** присутствует; условий нет — `[]` (не `null`) |
+
+Остальные поля (`shipper_name`, `pieces`, `weight_total`, `weight_per_piece`, `origin`, `destination`, `pickup_date`, `delivery_date`) — как в `card_v1`, с теми же типами и правилами. Все 11 ключей присутствуют всегда.
+
+### Особые условия
+
+У каждого вида — не больше одного условия; ключ `kind` идёт первым. Только числа и значения из фиксированных списков, без свободного текста (D-081).
+
+| `kind` | Ключи | Значения |
+|---|---|---|
+| `temperature` — температурный режим | `min_c`, `max_c` | число или `null`; если заданы оба, `min_c ≤ max_c`. «+2…+6 °C» → 2 и 6; «не выше +5» → `null` и 5; «−18» → −18 и −18 |
+| `securing` — крепление | `methods` | список без повторов из `straps` (ремни), `chains` (цепи), `wheel_chocks` (противооткатные упоры), `anti_slip_mats` (антискользящие коврики), `load_bars` (распорные штанги) |
+| `packaging` — упаковка | `types` | список без повторов из `crate` (обрешётка, ящик), `stretch_film` (стрейч-плёнка), `moisture_protection` (влагозащитная), `shock_protection` (амортизирующая) |
+| `oversize` — негабарит | `length`, `width`, `height` | `{value, unit}` (`value` > 0, `unit`: `m` или `cm`) или `null`; в метры переводит код (`qf.domain.to_m`), модель копирует длину как в тексте |
+| `sensors` — наблюдение за датчиками | `parameters` | список без повторов из `temperature`, `humidity`, `pressure`, `tilt` (наклон, горизонталь), `shock` (удары), `door_opening` (открытие дверей) |
+
+- «Держать +2…+6» — это `temperature`; «с датчиком температуры», «с термописцем» — `sensors: ["temperature"]`. В одной заявке может быть и то и другое.
+- Значения могут быть пустыми (`methods: []`, оба предела температуры `null`, все габариты `null`): так записывается условие, названное без значений.
+- **«Особые условия: да/нет»** модель не пишет — это вычисляет код: `qf.domain.has_special_conditions(card)` («да», если список не пуст).
+- **Конфликты** — только у полей карточки; поле `special_conditions` в `conflicts` недопустимо (D-084).
+
+### Правило `missing_fields` для `card_v2`
+
+Вычисляет только `qf.domain.compute_missing_fields_v2(card)`. Порядок фиксирован: `origin`, `destination`, `pickup_date`, `equipment_type`, `pieces`, `weight_total`, затем `special_conditions.temperature`, `.securing`, `.packaging`, `.oversize`, `.sensors`.
+
+| Имя | Когда недостающее |
+|---|---|
+| основные поля | как в `card_v1` (без `temperature_c`): `null`; `weight_total` — если нет ни `weight_total`, ни `weight_per_piece` |
+| условие, обязательное для транспорта (`REQUIRED_CONDITIONS`) | `reefer` без `temperature` (или оба предела `null`); `lowbed` без `oversize` или без любого из трёх габаритов |
+| любое другое условие | названо без значений: оба предела температуры `null`, пустой список способов, видов или параметров, все три габарита `null` |
+
+Условие, которое заявка **не называет**, отсутствует, и клиента о нём не спрашивают (решение пользователя, D-084); исключение — обязательные для транспорта.
+
+**Согласованность** (`check_target_consistency_v2`, код ошибки `TARGET_INCONSISTENT`): `missing_fields` по правилу; конфликты — без повторов и только у `null`-полей; не заданы одновременно `weight_total` и `weight_per_piece`; условия идут в порядке видов выше, значения в списках — в порядке, в котором они перечислены в таблице. Порядок — правило согласованности, а не формы: ответ с другим порядком разбирается, метрики сравнивают списки как множества (D-088).
+
+### Примеры (каноническая сериализация)
+
+Рефрижератор, +2…+6 °C, с датчиком температуры, ничего не пропущено:
+
+```json
+{"card":{"shipper_name":"ООО Север","cargo_category":"food_beverage","equipment_type":"reefer","pieces":18,"weight_total":{"value":12.6,"unit":"t"},"weight_per_piece":null,"origin":{"city":"Пермь","region":"Пермский край"},"destination":{"city":"Казань","region":"Республика Татарстан"},"pickup_date":"2024-03-12","delivery_date":"2024-03-14","special_conditions":[{"kind":"temperature","min_c":2,"max_c":6},{"kind":"sensors","parameters":["temperature"]}]},"missing_fields":[],"conflicts":[]}
+```
+
+Трал со спецтехникой, крепление цепями и упорами, известны длина и высота, ширины нет — габариты недостающие:
+
+```json
+{"card":{"shipper_name":null,"cargo_category":"machinery","equipment_type":"lowbed","pieces":1,"weight_total":{"value":18,"unit":"t"},"weight_per_piece":null,"origin":{"city":"Пермь","region":"Пермский край"},"destination":{"city":"Казань","region":"Республика Татарстан"},"pickup_date":"2024-03-12","delivery_date":null,"special_conditions":[{"kind":"securing","methods":["chains","wheel_chocks"]},{"kind":"oversize","length":{"value":9.5,"unit":"m"},"width":null,"height":{"value":360,"unit":"cm"}}]},"missing_fields":["special_conditions.oversize"],"conflicts":[]}
+```
+
+### Разбор, запись и реестр схем
+
+- `serialize_target` — общий для обеих схем (канон: компактный JSON, ключи в порядке объявления, целые числа без `.0`). Строгий разбор — `parse_target_v2`, мягкий — `parse_target_lenient_v2`, с теми же правилами формата, что и для `card_v1`. Ответ `card_v1` не разбирается как `card_v2` и наоборот.
+- **Реестр схем `TARGET_SCHEMAS`** (`qf/domain/schemas.py`): по версии схемы записи (`SFTRecord.schema_version`) даёт разбор, запись, правило недостающих полей, проверку согласованности и JSON-схему ответа (для constrained decoding; пригодность для грамматики llama.cpp проверяется на шаге 10). `check_record` выбирает правила через реестр.
+- Задача `shipment_extraction` отвечает в двух схемах: `card_v1` с промптом `system_extract_v1`, `card_v2` с промптом `system_extract_v2` (sha256 `fa3297296346666443f60d0318f01eed7c669032ffcacc534e8fd166544f4e41`, 3 176 символов против 1 540 у v1). Запись в схеме, которой задача не отвечает, — ошибка `UNSUPPORTED_SCHEMA`; `qf validate-data` сверяет системный промпт записи с промптом её схемы.
+
 ## Города
 
 ### Российские города карточки
@@ -320,8 +386,9 @@
 | `SCHEMA` | строка не проходит `SFTRecord` | ошибка |
 | `ROLE_ORDER` | сообщения не в порядке system, user, assistant | ошибка |
 | `UNKNOWN_TASK` | задачи нет в реестре `TASKS` | ошибка |
+| `UNSUPPORTED_SCHEMA` | задача не отвечает в схеме записи (`schema_version`), D-089 | ошибка |
 | `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT` | ответ пустой, не разбирается строго, записан не канонически, нарушает правило `missing_fields` или конфликтов | ошибка |
-| `PROMPT_MISMATCH` | системный промпт отличается от промпта задачи (`system_extract_v1`) | ошибка |
+| `PROMPT_MISMATCH` | системный промпт отличается от промпта задачи для схемы записи (`card_v1` → `system_extract_v1`, `card_v2` → `system_extract_v2`) | ошибка |
 | `SPLIT_MISMATCH` | поле `split` записи не совпадает с именем файла | ошибка |
 | `DUP_ID` | один id в двух местах | ошибка |
 | `GROUP_LEAK` | одна группа (`group_id`) в двух сплитах | ошибка |
@@ -350,11 +417,12 @@
 
 ## Задачи модели
 
-Набор задач открыт (D-040): имя задачи записи (`SFTRecord.task`) проверяется по реестру `TASKS` (`qf/domain/tasks.py`). Задача связывает системный промпт и схему ответа. Новая задача (этап v0.2) — новая запись в реестре; формат записи не меняется.
+Набор задач открыт (D-040): имя задачи записи (`SFTRecord.task`) проверяется по реестру `TASKS` (`qf/domain/tasks.py`). Задача связывает каждую схему ответа, в которой она отвечает, с системным промптом (`TaskSpec.prompts`, D-086). Новая задача (этап v0.2) — новая запись в реестре; формат записи не меняется.
 
 | Задача | Системный промпт | Схема ответа | С шага |
 |---|---|---|---|
-| `shipment_extraction` | `system_extract_v1` (файл промпта появится на шаге 6) | `card_v1` | 4 |
+| `shipment_extraction` | `system_extract_v1` | `card_v1` | 4 |
+| `shipment_extraction` | `system_extract_v2` | `card_v2` | V1 |
 
 ## Формат SFT-записи (`sft_record_v1`)
 
@@ -371,7 +439,7 @@
 | `synthetic` | bool | синтезирована ли запись из таблиц |
 | `template_family` | строка | семейство шаблона (`T1`…`T8`, шаг 6) |
 | `variant` | объект `VariantInfo` | как отрендерен текст (ниже) |
-| `schema_version` | `card_v1` | схема ответа ассистента |
+| `schema_version` | `card_v1` \| `card_v2` | схема ответа ассистента; правила проверки берутся из реестра `TARGET_SCHEMAS` по этой версии |
 | `split` | `train` \| `val` \| `test` \| `test_ood` \| `bench` \| `null` | сплит; `null` — ещё не назначен |
 | `messages` | список | ровно три сообщения `system`, `user`, `assistant` в этом порядке; у каждого `role` и `content` |
 
@@ -385,7 +453,7 @@
 {"id":"qf-train-LOAD00001-0","task":"shipment_extraction","group_id":"load:LOAD00001","source_id":"yogape/logistics-operations@54e7d1d1a437:LOAD00001","language":"ru","reviewed":false,"synthetic":true,"template_family":"T1","variant":{"weight_unit":"kg","weight_mode":"total","dropped_fields":[],"hard_cases":[],"request_date":"2021-12-28","date_style":"iso","city_lang":"ru","ood_reason":null},"schema_version":"card_v1","split":"train","messages":[{"role":"system","content":"…"},{"role":"user","content":"Дата запроса: 2021-12-28\n\n…"},{"role":"assistant","content":"{\"card\":{\"shipper_name\":\"National Retail\",…},\"missing_fields\":[],\"conflicts\":[]}"}]}
 ```
 
-Проверки одной записи — `qf.domain.check_record(record)`; коды: `UNKNOWN_TASK` (задачи нет в `TASKS`), `EMPTY_ASSISTANT`, `TARGET_PARSE` (ответ не разбирается строго), `NOT_CANONICAL`, `TARGET_INCONSISTENT` (нарушено правило `missing_fields` или конфликтов). Межзаписные проверки (утечки, дубликаты) добавит `qf validate-data` на шаге 7.
+Проверки одной записи — `qf.domain.check_record(record)`; коды: `UNKNOWN_TASK` (задачи нет в `TASKS`), `UNSUPPORTED_SCHEMA` (задача не отвечает в схеме записи), `EMPTY_ASSISTANT`, `TARGET_PARSE` (ответ не разбирается строго), `NOT_CANONICAL`, `TARGET_INCONSISTENT` (нарушено правило `missing_fields` или конфликтов). Межзаписные проверки (утечки, дубликаты) добавит `qf validate-data` на шаге 7.
 
 ### `group_id`
 

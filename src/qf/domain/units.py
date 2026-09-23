@@ -1,6 +1,7 @@
-"""Mass units: exact conversion to kg and rounding rules for rendered text (plan B.3, D-004).
+"""Units: exact conversion of masses to kg and of lengths to metres, rounding rules for
+rendered text (plan B.3, D-004, D-081).
 
-The model copies a mass as written (`{value, unit}`); every conversion is done here.
+The model copies a mass or a length as written (`{value, unit}`); every conversion is done here.
 """
 
 from __future__ import annotations
@@ -9,9 +10,10 @@ import math
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
 
-from qf.contracts import Quantity, WeightUnit
+from qf.contracts import Length, LengthUnit, Quantity, WeightUnit
 
 __all__ = [
+    "CM_TO_M",
     "LB_TO_KG",
     "T_TO_KG",
     "format_kg",
@@ -20,17 +22,25 @@ __all__ = [
     "render_value_from_lbs",
     "render_value_per_piece",
     "to_kg",
+    "to_m",
 ]
 
 LB_TO_KG: Final = 0.45359237  # exact by definition of the international pound
 T_TO_KG: Final = 1000.0
 _KG_PER_UNIT: Final[dict[WeightUnit, float]] = {"kg": 1.0, "t": T_TO_KG, "lb": LB_TO_KG}
 _LB_TO_KG_EXACT: Final = Decimal("0.45359237")
+CM_TO_M: Final = 0.01
+_M_PER_UNIT: Final[dict[LengthUnit, float]] = {"m": 1.0, "cm": CM_TO_M}
 
 
 def to_kg(quantity: Quantity) -> float:
     """Mass in kg, not rounded."""
     return quantity.value * _KG_PER_UNIT[quantity.unit]
+
+
+def to_m(length: Length) -> float:
+    """Length in metres, not rounded (card_v2 dimensions)."""
+    return length.value * _M_PER_UNIT[length.unit]
 
 
 def format_kg(kg: float) -> float:

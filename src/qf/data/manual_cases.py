@@ -97,7 +97,7 @@ def _record(case: ManualCase, n: int) -> tuple[SFTRecord, list[Issue], list[str]
                             date_style="text", city_lang=case.language, ood_reason=None),
         schema_version=CARD_SCHEMA_VERSION, split="bench",
         messages=[*build_messages(case.text.strip(), case.request_date, case.language,
-                                  task.system_prompt_version),
+                                  task.prompt_for(CARD_SCHEMA_VERSION)),
                   Message(role="assistant", content=serialize_target(target))],
     )  # fmt: skip
     return record, errors, warnings

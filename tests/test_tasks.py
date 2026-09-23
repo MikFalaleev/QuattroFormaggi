@@ -22,11 +22,12 @@ def test_v01_has_one_task() -> None:
     assert TASKS.names() == ["shipment_extraction"]
     task = get_task("shipment_extraction")
     assert task is SHIPMENT_EXTRACTION
-    assert (task.name, task.system_prompt_version, task.target_schema_version) == (
-        "shipment_extraction",
-        "system_extract_v1",
-        "card_v1",
-    )
+    assert task.name == "shipment_extraction"
+    assert task.prompts == (("card_v1", "system_extract_v1"), ("card_v2", "system_extract_v2"))
+    assert task.schema_versions == ("card_v1", "card_v2")
+    assert task.prompt_for("card_v2") == "system_extract_v2"
+    with pytest.raises(QFError, match="does not answer in card_v9"):
+        task.prompt_for("card_v9")
     assert TASKS.port is None
 
 
@@ -46,10 +47,17 @@ def test_task_cannot_be_registered_twice() -> None:
 
 
 def test_task_with_unsupported_schema_is_refused() -> None:
-    spec = TaskSpec(name="future_task", system_prompt_version="p", target_schema_version="card_v9")  # type: ignore[arg-type]
+    spec = TaskSpec(name="future_task", prompts=(("card_v9", "system_extract_v1"),))  # type: ignore[arg-type]
     with pytest.raises(QFError, match="unsupported schema version 'card_v9'"):
         register_task(spec)
+    unknown_prompt = TaskSpec(name="future_task", prompts=(("card_v1", "system_extract_v9"),))
+    with pytest.raises(QFError, match="unknown system prompt version"):
+        register_task(unknown_prompt)
     assert "future_task" not in TASKS
+    with pytest.raises(QFError, match="no answer schema"):
+        TaskSpec(name="future_task", prompts=())
+    with pytest.raises(QFError, match="listed twice"):
+        TaskSpec(name="future_task", prompts=(("card_v1", "a"), ("card_v1", "b")))
 
 
 def test_clean_record_passes() -> None:

@@ -118,13 +118,12 @@ class GenerateConfig(StrictConfig):
 def _check_against_registries(cfg: GenerateConfig) -> None:
     """Names in the config must exist; OOD families are exactly the `ood_only` ones."""
     task = get_task(cfg.task)
-    if task.system_prompt_version != cfg.system_prompt_version:
+    prompt = task.prompt_for(cfg.schema_version)
+    if prompt != cfg.system_prompt_version:
         raise QFError(
-            f"task {cfg.task} uses prompt {task.system_prompt_version}, "
+            f"task {cfg.task} uses prompt {prompt} for {cfg.schema_version}, "
             f"config says {cfg.system_prompt_version}"
         )
-    if task.target_schema_version != cfg.schema_version:
-        raise QFError(f"task {cfg.task} answers in {task.target_schema_version}")
     for name in cfg.families:
         TEMPLATE_FAMILIES.get(name)
     for name in [*cfg.hard, *(key for key in cfg.mix if key not in ("clean", "hard"))]:
