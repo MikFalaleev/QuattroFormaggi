@@ -1,0 +1,106 @@
+"""Infrastructure layer: no knowledge of the logistics domain (plan C.2).
+
+Other packages import only from here (`from qf.common import QFError`), never from submodules.
+"""
+
+from qf.common.artifacts import (
+    MANIFEST_SUFFIX,
+    ArtifactKind,
+    ArtifactManifest,
+    ArtifactRef,
+    artifact_sha256,
+    lineage,
+    load_artifact_manifest,
+    manifest_path_for,
+    read_artifact,
+    sha256_dir,
+    write_artifact,
+)
+from qf.common.config import ComponentConfig, StrictConfig, config_hash, load_yaml_config
+from qf.common.doctor import (
+    DEFAULT_REPORT_PATH,
+    LMSTUDIO_MODELS_URL,
+    collect_environment,
+    format_environment_report,
+)
+from qf.common.errors import DataValidationError, Issue, NotImplementedStageError, QFError
+from qf.common.hashing import canonical_json, sha256_file, sha256_json, sha256_text
+from qf.common.logging import setup_logging
+from qf.common.manifest import (
+    MANIFEST_FILENAME,
+    RunManifest,
+    RunStatus,
+    collect_git_info,
+    collect_package_versions,
+    new_run_id,
+    read_manifest,
+    update_manifest,
+    write_manifest,
+)
+from qf.common.paths import (
+    ARTIFACTS,
+    CONFIGS,
+    DATA_PROCESSED,
+    DATA_RAW,
+    DATA_SPLITS,
+    PROJECT_NAME,
+    ROOT_ENV_VAR,
+    RUNS,
+    atomic_write_text,
+    project_root,
+)
+from qf.common.registry import Registry, all_registries
+from qf.common.seed import set_global_seed
+
+__all__ = [
+    "ARTIFACTS",
+    "CONFIGS",
+    "DATA_PROCESSED",
+    "DATA_RAW",
+    "DATA_SPLITS",
+    "DEFAULT_REPORT_PATH",
+    "LMSTUDIO_MODELS_URL",
+    "MANIFEST_FILENAME",
+    "MANIFEST_SUFFIX",
+    "PROJECT_NAME",
+    "ROOT_ENV_VAR",
+    "RUNS",
+    "ArtifactKind",
+    "ArtifactManifest",
+    "ArtifactRef",
+    "ComponentConfig",
+    "DataValidationError",
+    "Issue",
+    "NotImplementedStageError",
+    "QFError",
+    "Registry",
+    "RunManifest",
+    "RunStatus",
+    "StrictConfig",
+    "all_registries",
+    "artifact_sha256",
+    "atomic_write_text",
+    "canonical_json",
+    "collect_environment",
+    "collect_git_info",
+    "collect_package_versions",
+    "config_hash",
+    "format_environment_report",
+    "lineage",
+    "load_artifact_manifest",
+    "load_yaml_config",
+    "manifest_path_for",
+    "new_run_id",
+    "project_root",
+    "read_artifact",
+    "read_manifest",
+    "set_global_seed",
+    "setup_logging",
+    "sha256_dir",
+    "sha256_file",
+    "sha256_json",
+    "sha256_text",
+    "update_manifest",
+    "write_artifact",
+    "write_manifest",
+]

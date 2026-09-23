@@ -1,0 +1,32 @@
+# Private data, weights and run outputs (IMPLEMENTATION_PLAN.md A.2.9)
+data/
+artifacts/
+runs/
+*.gguf
+*.safetensors
+*.bin
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+.venv*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+.import_linter_cache/
+
+# Local AI assistant files (not part of the repository)
+CLAUDE.md
+CLAUDE.local.md
+.claude/

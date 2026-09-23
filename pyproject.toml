@@ -1,0 +1,138 @@
+[project]
+name = "quattro-formaggi"
+version = "0.1.0.dev0"
+description = "Quattro Formaggi: QF-12B logistics fine-tune pipeline and the QF-Lab from-scratch Transformer"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pydantic>=2",
+    "numpy",
+    "pyyaml",
+    "pandas",
+    "huggingface_hub",
+    "httpx",
+    "psutil",
+]
+
+[project.optional-dependencies]
+train-cuda = [
+    "torch",
+    "transformers",
+    "peft",
+    "accelerate",
+    "bitsandbytes; sys_platform == 'linux'",
+    "datasets",
+    "safetensors",
+    "sentencepiece",
+    "protobuf",
+]
+train-cpu-test = [
+    "torch",
+    "transformers",
+    "peft",
+    "accelerate",
+]
+tokenizer = [
+    "transformers",
+    "tokenizers",
+    "jinja2",
+]
+lab = [
+    "torch",
+    "tokenizers",
+]
+runtime = []
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "types-PyYAML",
+    "types-psutil",
+    "pandas-stubs",
+    "import-linter",
+]
+
+[project.scripts]
+qf = "qf.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "qf"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/qf"]
+
+[[tool.mypy.overrides]]
+module = ["bitsandbytes", "bitsandbytes.*", "peft", "peft.*", "transformers", "transformers.*", "torch", "torch.*", "gguf", "gguf.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -ra"
+markers = [
+    "slow: test takes longer than 10 seconds",
+    "network: needs internet access (HF Hub); run only with human permission",
+    "needs_tokenizer: needs locally downloaded Mistral-Nemo tokenizer files",
+    "gpu: needs CUDA; run only on the remote GPU machine",
+    "lmstudio: needs a running LM Studio server",
+]
+
+[tool.coverage.run]
+source = ["qf"]
+branch = true
+
+# Architecture contracts: IMPLEMENTATION_PLAN.md C.3. `|` = independent siblings in one layer.
+[tool.importlinter]
+root_package = "qf"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: cli > stages > backends|domain > contracts > common"
+type = "layers"
+containers = ["qf"]
+layers = [
+    "cli",
+    "data | eval | training | export | runtime | lab",
+    "backends | domain",
+    "contracts",
+    "common",
+]
+
+[[tool.importlinter.contracts]]
+name = "Stage packages are independent (they exchange artifacts, not imports)"
+type = "independence"
+modules = ["qf.data", "qf.eval", "qf.training", "qf.export", "qf.runtime", "qf.lab"]
+
+[[tool.importlinter.contracts]]
+name = "QF-Lab is isolated: it may import only qf.common"
+type = "forbidden"
+source_modules = ["qf.lab"]
+forbidden_modules = [
+    "qf.contracts", "qf.domain", "qf.backends", "qf.data", "qf.eval",
+    "qf.training", "qf.export", "qf.runtime", "qf.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Backends and export do not use domain logic"
+type = "forbidden"
+source_modules = ["qf.backends", "qf.export"]
+forbidden_modules = ["qf.domain"]
+
+[[tool.importlinter.contracts]]
+name = "Light packages never import heavy ML libraries"
+type = "forbidden"
+source_modules = ["qf.common", "qf.contracts", "qf.domain", "qf.data", "qf.eval", "qf.runtime"]
+forbidden_modules = ["torch", "transformers", "peft", "bitsandbytes"]
