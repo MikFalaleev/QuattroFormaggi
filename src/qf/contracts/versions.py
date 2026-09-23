@@ -17,6 +17,7 @@ SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "metrics": frozenset({"profile_report_v1"}),  # step 3
     "sft_dataset": frozenset({"sft_record_v1"}),  # step 4 (files are written from step 6)
     "target": frozenset({"card_v1"}),  # step 4
+    "load_facts": frozenset({"load_facts_v1"}),  # step 5
 }
 
 

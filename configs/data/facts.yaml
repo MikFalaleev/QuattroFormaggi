@@ -1,0 +1,5 @@
+# Step 5: how LoadFacts are built from the raw dataset (IMPLEMENTATION_PLAN.md step 5, D-047).
+# The raw dataset itself is located through configs/data/source.yaml (D-035).
+builder:
+  name: logistics_operations_v1
+  city_map: configs/data/city_map_ru_v1.yaml

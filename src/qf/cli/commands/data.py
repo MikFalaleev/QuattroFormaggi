@@ -10,9 +10,13 @@ from typing import Any
 from qf.cli.wiring import build
 from qf.common import CONFIGS, DATA_PROCESSED, load_yaml_config, project_root
 from qf.data import (
+    FACTS_BUILDERS,
+    LOAD_FACTS_FILENAME,
     RAW_SOURCES,
     Expectations,
+    FactsFileConfig,
     SourceFileConfig,
+    build_facts_artifact,
     fetch_raw_dataset,
     profile_raw_dataset,
     raw_dataset_path,
@@ -21,15 +25,19 @@ from qf.data import (
 
 __all__ = [
     "DEFAULT_EXPECTATIONS",
+    "DEFAULT_FACTS_CONFIG",
     "DEFAULT_SOURCE_CONFIG",
+    "configure_facts",
     "configure_fetch",
     "configure_profile",
+    "run_facts",
     "run_fetch",
     "run_profile",
 ]
 
 DEFAULT_SOURCE_CONFIG = CONFIGS / "data" / "source.yaml"
 DEFAULT_EXPECTATIONS = CONFIGS / "data" / "expectations.yaml"
+DEFAULT_FACTS_CONFIG = CONFIGS / "data" / "facts.yaml"
 
 
 def _add_source_config(parser: argparse.ArgumentParser, flag: str) -> None:
@@ -112,4 +120,30 @@ def run_profile(args: argparse.Namespace) -> int:
     if not outcome.report.passed:
         print(f"qf: profile failed: {', '.join(outcome.report.failed_checks)}", file=sys.stderr)
         return 1
+    return 0
+
+
+def configure_facts(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=f"facts builder config (default: <project>/{DEFAULT_FACTS_CONFIG})",
+    )
+    _add_source_config(parser, "--source-config")
+
+
+def run_facts(args: argparse.Namespace) -> int:
+    root = project_root()
+    source, _ = _load_source(root, args.source_config)
+    file_config = load_yaml_config(args.config or root / DEFAULT_FACTS_CONFIG, FactsFileConfig)
+    result = build_facts_artifact(
+        build(FACTS_BUILDERS, file_config.builder),
+        raw_dataset_path(source, root),
+        root=root,
+        out_path=root / DATA_PROCESSED / LOAD_FACTS_FILENAME,
+        config=file_config.model_dump(mode="json"),
+    )
+    print(f"Built {result.count} load facts: {result.ref.path} (sha256 {result.ref.sha256[:12]})")
+    print(f"Run manifest: {result.run_dir}")
     return 0

@@ -947,7 +947,8 @@ class SFTRecord(BaseModel):
   - маппинги `Dry Van→dry_van`, `Refrigerated→reefer`, `Food/Beverage→food_beverage`, `Consumer Goods→consumer_goods` и т. д. задаются явными словарями. Неизвестное значение → исключение;
   - порядок результата — сортировка по `load_id`.
 - `save_facts(facts, path: Path) -> ArtifactRef` / `load_facts(ref: ArtifactRef) -> list[LoadFacts]` — JSONL в `data/processed/load_facts.jsonl`, артефакт `load_facts@load_facts_v1` с родителем `raw_dataset` (C.6).
-- CLI: встроить в `qf data build` (шаг 6) как первый этап; отдельной команды не нужно.
+- CLI: ~~встроить в `qf data build` (шаг 6) как первый этап; отдельной команды не нужно~~. **Реализовано (D-053):** отдельная команда `qf data facts [--config configs/data/facts.yaml]` — критерий приёмки требует запуска с `run_manifest.json` уже на шаге 5; `qf data build` (шаг 6) первым этапом вызывает тот же сценарий `build_facts_artifact`, а не свою копию.
+- **Реализовано иначе (D-051, D-052):** `LoadFacts` — строгая модель `ContractModel`, а не dataclass (JSONL читается `LoadFacts.model_validate_json`); порт `FactsBuilder.build(raw, root)` + `inputs(root)` (файлы, которые читает сборщик, с sha256 — так хэш таблицы замены городов попадает в манифест, а сценарий шага не знает о ней).
 
 **Тесты:**
 
@@ -1126,7 +1127,7 @@ stratify_by: [equipment_type, load_month, route_id]
 
 Для каждой записи используется отдельный RNG: `random.Random(f"{seed}:{load_id}:{n}")`. Так результат не зависит от порядка обработки.
 
-CLI: `qf data build [--config configs/data/generate_v1.yaml]`.
+CLI: `qf data build [--config configs/data/generate_v1.yaml]`. Первый этап — факты о загрузках тем же сценарием, что и `qf data facts` (`qf.data.build_facts_artifact`, шаг 5); затем генерация читает артефакт `load_facts` через `read_artifact` + `load_facts`.
 
 **Тесты:**
 

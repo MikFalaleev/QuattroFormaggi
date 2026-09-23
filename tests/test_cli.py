@@ -17,6 +17,7 @@ PLANNED_COMMANDS = {
     "doctor",
     "data fetch",
     "data profile",
+    "data facts",
     "data build",
     "data split",
     "validate-data",

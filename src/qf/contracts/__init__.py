@@ -15,8 +15,9 @@ from qf.contracts.card_v1 import (
     ShipmentCard,
     WeightUnit,
 )
+from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
-from qf.contracts.ports import RawSource
+from qf.contracts.ports import FactsBuilder, RawSource
 from qf.contracts.records import (
     RECORD_ROLES,
     SFT_RECORD_SCHEMA_VERSION,
@@ -32,6 +33,7 @@ from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, 
 
 __all__ = [
     "CARD_SCHEMA_VERSION",
+    "LOAD_FACTS_SCHEMA_VERSION",
     "RECORD_ROLES",
     "SFT_RECORD_SCHEMA_VERSION",
     "SUPPORTED_SCHEMA_VERSIONS",
@@ -39,11 +41,13 @@ __all__ = [
     "Conflict",
     "EquipmentType",
     "ExtractionTarget",
+    "FactsBuilder",
     "FieldName",
     "GenerationRequest",
     "GenerationResult",
     "HardCaseName",
     "Language",
+    "LoadFacts",
     "Message",
     "Place",
     "Quantity",

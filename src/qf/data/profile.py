@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -26,7 +26,15 @@ from qf.common import (
     write_artifact,
 )
 from qf.contracts import supported_versions
-from qf.data.raw_tables import DTYPES, PRIMARY_KEYS, RawTables, load_raw_tables
+from qf.data.raw_tables import (
+    DELIVERY,
+    DTYPES,
+    PICKUP,
+    PRIMARY_KEYS,
+    RawTables,
+    load_raw_tables,
+    pickup_delivery_by_load,
+)
 
 __all__ = [
     "CHECKS",
@@ -45,7 +53,6 @@ __all__ = [
 PROFILE_REPORT_VERSION = "profile_report_v1"
 PROFILE_JSON = "profile_report.json"
 PROFILE_MARKDOWN = "profile_report.md"
-PICKUP, DELIVERY = "Pickup", "Delivery"
 _MAX_EXAMPLES = 10
 _WEIGHT_QUANTILES = (0.0, 0.05, 0.25, 0.5, 0.75, 0.95, 1.0)
 _RUN_KIND = "profile"
@@ -144,20 +151,8 @@ def _counts(series: pd.Series) -> dict[str, int]:
     return {str(key): int(value) for key, value in counts.items()}
 
 
-def _events_by_load(t: RawTables) -> pd.DataFrame:
-    """One row per load that has exactly one Pickup and one Delivery event."""
-    events = t.delivery_events[t.delivery_events["event_type"].isin([PICKUP, DELIVERY])]
-    events = events.drop_duplicates(subset=["load_id", "event_type"], keep=False)
-    columns = ["scheduled_datetime", "location_city", "location_state"]
-    wide = events.pivot(index="load_id", columns="event_type", values=columns)
-    pairs = cast(list[tuple[str, str]], list(wide.columns))
-    wide.columns = [f"{event.lower()}_{field}" for field, event in pairs]
-    wide = wide.dropna(subset=["pickup_location_city", "delivery_location_city"], how="any")
-    return wide.reset_index()
-
-
 def _loads_with_events(t: RawTables) -> pd.DataFrame:
-    return t.loads.merge(_events_by_load(t), on="load_id", how="inner")
+    return t.loads.merge(pickup_delivery_by_load(t), on="load_id", how="inner")
 
 
 def _transit_days(merged: pd.DataFrame) -> pd.Series:

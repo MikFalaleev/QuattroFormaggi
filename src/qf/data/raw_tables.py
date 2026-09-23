@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -16,11 +17,14 @@ from qf.common import DataValidationError, Issue, QFError
 
 __all__ = [
     "DATE_FORMATS",
+    "DELIVERY",
     "DTYPES",
     "EXPECTED_COLUMNS",
+    "PICKUP",
     "PRIMARY_KEYS",
     "RawTables",
     "load_raw_tables",
+    "pickup_delivery_by_load",
 ]
 
 DTYPES: dict[str, dict[str, str]] = {
@@ -80,6 +84,7 @@ PRIMARY_KEYS: dict[str, str] = {
     "customers": "customer_id",
     "delivery_events": "event_id",
 }
+PICKUP, DELIVERY = "Pickup", "Delivery"
 # Only the date columns the pipeline uses are parsed; the rest stay strings.
 DATE_FORMATS: dict[str, dict[str, str]] = {
     "loads": {"load_date": "%Y-%m-%d"},
@@ -142,3 +147,20 @@ def _read_table(raw_dir: Path, table: str) -> pd.DataFrame:
 def load_raw_tables(raw_dir: Path) -> RawTables:
     """Load loads, routes, customers and delivery_events from a fetched raw dataset directory."""
     return RawTables(**{table: _read_table(raw_dir, table) for table in DTYPES})
+
+
+def pickup_delivery_by_load(t: RawTables) -> pd.DataFrame:
+    """One row per load that has exactly one Pickup and one Delivery event.
+
+    Columns: load_id, {pickup,delivery}_{scheduled_datetime,location_city,location_state}.
+    Loads with a missing or repeated event are left out; callers that need every load must
+    check which ones are absent.
+    """
+    events = t.delivery_events[t.delivery_events["event_type"].isin([PICKUP, DELIVERY])]
+    events = events.drop_duplicates(subset=["load_id", "event_type"], keep=False)
+    columns = ["scheduled_datetime", "location_city", "location_state"]
+    wide = events.pivot(index="load_id", columns="event_type", values=columns)
+    pairs = cast(list[tuple[str, str]], list(wide.columns))
+    wide.columns = [f"{event.lower()}_{field}" for field, event in pairs]
+    wide = wide.dropna(subset=["pickup_location_city", "delivery_location_city"], how="any")
+    return wide.reset_index()

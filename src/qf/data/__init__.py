@@ -4,6 +4,18 @@ Other packages import from here, never from submodules.
 """
 
 from qf.data.city_map import CityMap, load_city_map
+from qf.data.facts import (
+    CARGO_CATEGORIES,
+    EQUIPMENT_TYPES,
+    LOAD_FACTS_FILENAME,
+    FactsFileConfig,
+    FactsResult,
+    LogisticsOpsFactsBuilder,
+    build_facts_artifact,
+    build_load_facts,
+    load_facts,
+    save_facts,
+)
 from qf.data.fetch import (
     PROVENANCE_FILENAME,
     RAW_SCHEMA_VERSION,
@@ -30,10 +42,27 @@ from qf.data.profile import (
     profile_tables,
     render_profile_markdown,
 )
-from qf.data.raw_tables import EXPECTED_COLUMNS, RawTables, load_raw_tables
-from qf.data.registries import RAW_SOURCES
+from qf.data.raw_tables import (
+    EXPECTED_COLUMNS,
+    RawTables,
+    load_raw_tables,
+    pickup_delivery_by_load,
+)
+from qf.data.registries import FACTS_BUILDERS, RAW_SOURCES
 
 __all__ = [
+    "save_facts",
+    "pickup_delivery_by_load",
+    "load_facts",
+    "build_load_facts",
+    "build_facts_artifact",
+    "LogisticsOpsFactsBuilder",
+    "FactsResult",
+    "FactsFileConfig",
+    "LOAD_FACTS_FILENAME",
+    "FACTS_BUILDERS",
+    "EQUIPMENT_TYPES",
+    "CARGO_CATEGORIES",
     "CHECKS",
     "EXPECTED_COLUMNS",
     "PROVENANCE_FILENAME",

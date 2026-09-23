@@ -285,6 +285,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | Порт | Реестр | Имя в реестре | Модуль | Шаг | Ленивая регистрация |
 |---|---|---|---|---|---|
 | `RawSource` | `RAW_SOURCES` (`qf.data`, kind `raw_source`) | `hf_dataset` | `qf.data.fetch:HFDatasetSource` | 2 | нет (лёгкая: `huggingface_hub` — core-зависимость) |
+| `FactsBuilder` | `FACTS_BUILDERS` (`qf.data`, kind `facts_builder`) | `logistics_operations_v1` | `qf.data.facts:LogisticsOpsFactsBuilder` | 5 | нет (лёгкая: pandas) |
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (промпт `system_extract_v1`, схема ответа `card_v1`) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
@@ -305,3 +306,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - Проверки одной SFT-записи (`check_record`) вынесены в `qf/domain/record_checks.py` и возвращают `Issue` с кодами шага 7 (`UNKNOWN_TASK`, `EMPTY_ASSISTANT`, `TARGET_PARSE`, `NOT_CANONICAL`, `TARGET_INCONSISTENT`); `qf validate-data` (шаг 7) вызывает её и добавляет межзаписные проверки.
 - Города карточки — российские (D-047, D-048): `Place{city, region}`, справочник `qf.domain.CITIES`. Замена американских городов источника — данные конкретного датасета, поэтому она лежит не в `qf.domain`, а в `configs/data/city_map_ru_v1.yaml` и `qf.data.CityMap` (применяется при сборке фактов, шаг 5). Для другого источника данных (например, реальных российских заявок) таблица замены не нужна.
 - `qf.common.format_validation_error` стал публичным (раньше — приватная функция `config.py`): им же форматируются ошибки разбора ответа модели.
+
+## Реализация на шаге 5: отличия от текста Части C
+
+- Порт `FactsBuilder` шире строки таблицы C.4: `build(raw, root)` и `inputs(root) -> dict[str, str]` — файлы, которые сборщик читает помимо сырого артефакта, с sha256 для манифеста запуска (D-052). `LoadFacts` — строгая модель `ContractModel`, а не dataclass (D-051). Стадия фактов запускается отдельной командой `qf data facts` (D-053).
+- Разворот событий Pickup/Delivery по загрузке (`pickup_delivery_by_load`) лежит в `qf/data/raw_tables.py` и общий для `profile` и `facts` (D-054).
