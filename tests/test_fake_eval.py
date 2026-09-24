@@ -14,9 +14,14 @@ from tests import fake_eval
 from tests.test_harness import bench_records, install_bench
 
 
-def test_acceptance_config_lists_every_metric() -> None:
-    assert sorted(fake_eval.METRICS) == sorted(METRICS.names())
+def test_acceptance_configs_list_every_metric() -> None:
+    """bench_v1 keeps the metrics of step 9 (its run is pinned in tests/test_v1_frozen.py);
+    bench_v2 adds the metrics of the special conditions."""
+    assert set(fake_eval.METRICS) | set(fake_eval.METRICS_V2) == set(METRICS.names())
+    assert len(fake_eval.METRICS) == 26 and "field_accuracy.temperature_c" in fake_eval.METRICS
+    assert "field_accuracy.temperature_c" not in fake_eval.METRICS_V2
     assert set(fake_eval.SLICE_METRICS) <= set(fake_eval.METRICS)
+    assert set(fake_eval.SLICE_METRICS_V2) <= set(fake_eval.METRICS_V2)
 
 
 def test_mistake_pattern() -> None:

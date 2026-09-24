@@ -289,11 +289,16 @@ def test_repeated_record_ids_are_refused(root: Path, bench: Any) -> None:
                  root=root)  # fmt: skip
 
 
-def test_card_v2_answers_are_not_scored_before_v6(root: Path, bench: Any) -> None:
-    ref, _ = bench
+def test_answers_without_a_scorer_are_refused(
+    root: Path, bench: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref, records = bench
     backend = FakeBackend.from_answers({})
-    with pytest.raises(QFError, match="card_v2 cannot be scored yet"):
+    monkeypatch.setattr("qf.eval.harness.SCORED_SCHEMAS", ("card_v1",))
+    with pytest.raises(QFError, match="card_v2 cannot be scored"):
         run_eval([make_record_v2()], backend, config(ref), bench=ref, root=root)
+    with pytest.raises(QFError, match="different answer schemas"):
+        run_eval([records[0], make_record_v2()], backend, config(ref), bench=ref, root=root)
     assert backend.requests == []
 
 

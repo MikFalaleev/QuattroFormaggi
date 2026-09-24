@@ -3,7 +3,9 @@
 A new metric registered in `METRICS` is checked here without new tests: on perfect answers it
 gets its best value, on unparsable answers the worst value or None, and it aggregates an
 empty list without failing. The gold cases state every card field at least once (including
-temperature_c of a reefer and a per-piece weight) and conflicts of both kinds.
+temperature_c of a reefer and a per-piece weight) and conflicts of both kinds, in card_v1 and
+in card_v2 (every kind of special condition, sub-step V6): the metrics of one version are None
+for the scores of the other.
 """
 
 from __future__ import annotations
@@ -13,10 +15,23 @@ from datetime import date
 import pytest
 
 import qf.cli.wiring  # noqa: F401  (every registry)
-from qf.contracts import CaseScore, Conflict, ExtractionTarget, Metric, Quantity
-from qf.domain import serialize_target
-from qf.eval import FIELDS, METRICS, score_prediction
-from tests.factories import make_card, make_target
+from qf.contracts import (
+    CARD_V2_CONDITION_KINDS,
+    CaseScore,
+    Conflict,
+    ConflictV2,
+    ExtractionTarget,
+    ExtractionTargetV2,
+    Length,
+    Metric,
+    OversizeCondition,
+    PackagingCondition,
+    Quantity,
+    SecuringCondition,
+)
+from qf.domain import get_target_schema, serialize_target
+from qf.eval import FIELDS, FIELDS_V2, METRICS, score_prediction, score_prediction_v2
+from tests.factories import make_card, make_card_v2, make_target, make_target_v2
 
 
 def kg(value: float) -> Quantity:
@@ -36,16 +51,58 @@ def gold_cases() -> list[ExtractionTarget]:
     ]  # fmt: skip
 
 
+def gold_cases_v2() -> list[ExtractionTargetV2]:
+    def metres(value: float) -> Length:
+        return Length(value=value, unit="m")
+
+    lowbed = make_card_v2(
+        equipment_type="lowbed",
+        cargo_category="machinery",
+        pieces=1,
+        special_conditions=[
+            SecuringCondition(kind="securing", methods=["chains"]),
+            OversizeCondition(
+                kind="oversize", length=metres(9.5), width=metres(3.2), height=metres(3.6)
+            ),
+        ],
+    )
+    van = make_card_v2(
+        equipment_type="van",
+        special_conditions=[PackagingCondition(kind="packaging", types=["crate"])],
+    )
+    tent = make_card_v2(equipment_type="tent", special_conditions=[], weight_total=None)
+    return [
+        make_target_v2(),  # a reefer with a temperature and a temperature sensor
+        make_target_v2(lowbed),
+        make_target_v2(van),
+        make_target_v2(make_card_v2(weight_total=None, weight_per_piece=kg(500), pieces=4)),
+        make_target_v2(tent, conflicts=[ConflictV2(field="weight_total",
+                                                   values=[kg(9000), kg(10500)])]),
+        make_target_v2(make_card_v2(pieces=None),
+                       conflicts=[ConflictV2(field="pieces", values=[14, 15])]),
+    ]  # fmt: skip
+
+
 def test_gold_cases_state_every_field() -> None:
     cases = gold_cases()
     assert all(any(getattr(t.card, f) is not None for t in cases) for f in FIELDS)
     assert {c.field for t in cases for c in t.conflicts} == {"weight_total", "pieces"}
+    cases_v2 = gold_cases_v2()
+    assert all(any(getattr(t.card, f) not in (None, []) for t in cases_v2) for f in FIELDS_V2)
+    kinds = {c.kind for t in cases_v2 for c in t.card.special_conditions}
+    assert kinds == set(CARD_V2_CONDITION_KINDS)
+    assert {c.field for t in cases_v2 for c in t.conflicts} == {"weight_total", "pieces"}
 
 
 def scores(raw: str | None = None) -> list[CaseScore]:
-    """Perfect answers to the gold cases, or the same `raw` answer to each of them."""
-    return [score_prediction(f"case-{i}", gold, serialize_target(gold) if raw is None else raw)
-            for i, gold in enumerate(gold_cases())]  # fmt: skip
+    """Perfect answers to the gold cases of both versions, or the same `raw` answer to each."""
+    serialize_v2 = get_target_schema("card_v2").serialize
+    return [
+        *(score_prediction(f"case-{i}", gold, serialize_target(gold) if raw is None else raw)
+          for i, gold in enumerate(gold_cases())),
+        *(score_prediction_v2(f"case-v2-{i}", gold, serialize_v2(gold) if raw is None else raw)
+          for i, gold in enumerate(gold_cases_v2())),
+    ]  # fmt: skip
 
 
 def aggregate(metric: Metric, cases: list[CaseScore]) -> float | None:

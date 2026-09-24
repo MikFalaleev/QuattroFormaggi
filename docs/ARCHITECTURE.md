@@ -315,6 +315,10 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `critical_error_count`, `critical_error_count.pieces_weight_swap`, `critical_error_count.wrong_unit_magnitude`, `critical_error_count.origin_destination_swap`, `critical_error_count.hallucinated_required_field`, `critical_error_count.missed_conflict` | `qf.eval.metrics.builtin:CountMetric` (подклассы, `_count`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy_micro` | `qf.eval.metrics.builtin:FieldAccuracyMicro`` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `missing_f1` | `qf.eval.metrics.builtin:MissingF1`` | 9 | нет |
+| — (реестр без порта: записи — `Scorer`) | `SCORERS` (`qf.eval`, kind `scorer`) | `card_v1`, `card_v2` (оценка ответа, модель оценки в `scores.jsonl`, поля, критические ошибки, столбцы таблицы по видам кейсов) | `qf.eval.metrics.scorers` | V6 (D-104) | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.special_conditions`, `special_conditions_exact_rate`, `field_accuracy.special_conditions.temperature`, `field_accuracy.special_conditions.securing`, `field_accuracy.special_conditions.packaging`, `field_accuracy.special_conditions.oversize`, `field_accuracy.special_conditions.sensors` (только `card_v2`) | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | V6 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `critical_error_count.hallucinated_condition`, `critical_error_count.missed_condition` (только `card_v2`) | `qf.eval.metrics.builtin:CountMetric` (подклассы, `_count`)` | V6 | нет |
+| `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `condition_precision`, `condition_recall`, `condition_precision.temperature`, `condition_precision.securing`, `condition_precision.packaging`, `condition_precision.oversize`, `condition_precision.sensors`, `condition_recall.temperature`, `condition_recall.securing`, `condition_recall.packaging`, `condition_recall.oversize`, `condition_recall.sensors` (только `card_v2`) | `qf.eval.metrics.builtin:ConditionDetection` (подклассы, `_detection`) | V6 | нет |
 
 ## Реализация на шаге 1: отличия от текста Части C
 
@@ -378,3 +382,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 - Генератор общий для `card_v1` и `card_v2`: типы генератора (`RenderedField`, `RenderedRequest`, `RequestDraft`) и порты `TemplateFamily`/`HardCase` принимают данные обеих версий (`AnyFieldName`, `AnyLoadFacts`), а всё, что зависит от схемы — слова, фрагменты условий, сборщик эталона, факты, — выбирается словарём по версии схемы (`VOCABULARIES`, `ASSEMBLERS`, `FACTS_FOR_SCHEMA`), без ветвлений по версии (D-094).
 - `generate_rendered` возвращает записи вместе с черновиками (нужны инвариантам на реальных данных); `generate_records` — обёртка над ним.
 
+
+## Реализация подшага V6: отличия от текста Части C
+
+- Реестр оценки ответов `SCORERS` (`qf.eval.metrics.scorers`) — вторая половина реестра схем D-087: для каждой схемы ответа — функция оценки, модель оценки кейса, поля карточки, критические ошибки и столбцы таблицы критических ошибок по видам кейсов. Harness, отчёт и чтение прогона выбирают запись по `schema_version`, без ветвлений по версии (D-104).
+- Оценка ответа `card_v2` — `CaseScoreV2`, подкласс `CaseScore` с полями условий. Модель `CaseScore` не расширялась: строки `scores.jsonl` прогонов `card_v1` остаются байтово прежними, а порт `Metric` по-прежнему принимает `CaseScore`; метрики условий возвращают `None` для оценок `card_v1`. `field_correct` и `hallucinated_fields` принимают имена полей обеих версий (`AnyFieldName`).

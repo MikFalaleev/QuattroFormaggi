@@ -10,6 +10,7 @@ from typing import Any, Final
 
 from qf.common import QFError, atomic_write_text
 from qf.contracts import CaseScore, SFTRecord
+from qf.eval.metrics import get_scorer
 
 __all__ = [
     "EVAL_STATE_FILE",
@@ -83,12 +84,15 @@ def read_predictions(path: Path, *, repair: bool = False) -> dict[str, dict[str,
 
 
 def load_run(run_dir: Path) -> EvalRun:
-    """A finished run from disk (for `qf eval compare`)."""
+    """A finished run from disk (for `qf eval compare`); scores in the model of its schema."""
     try:
         state = json.loads((run_dir / EVAL_STATE_FILE).read_text(encoding="utf-8"))
         table = json.loads((run_dir / METRICS_FILE).read_text(encoding="utf-8"))
         lines = (run_dir / SCORES_FILE).read_text(encoding="utf-8").splitlines()
-        scores = [CaseScore.model_validate_json(line) for line in lines]
+        model = get_scorer(state.get("schema_version", "")).score_model
+        scores = [model.model_validate_json(line) for line in lines]
+    except QFError as exc:
+        raise QFError(f"{run_dir} cannot be read: {exc}") from exc
     except (OSError, ValueError) as exc:
         raise QFError(f"{run_dir} is not a finished eval run: {exc}") from exc
     predictions = read_predictions(run_dir / PREDICTIONS_FILE)

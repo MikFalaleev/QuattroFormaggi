@@ -39,7 +39,7 @@ from qf.contracts.card_v2 import ExtractionTarget as ExtractionTargetV2
 from qf.contracts.card_v2 import FieldName as FieldNameV2
 from qf.contracts.card_v2 import MissingField as MissingFieldV2
 from qf.contracts.card_v2 import ShipmentCard as ShipmentCardV2
-from qf.contracts.evaluation import CaseScore, MetricValue
+from qf.contracts.evaluation import CaseScore, CaseScoreV2, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.facts_v2 import LOAD_FACTS_V2_SCHEMA_VERSION, AnyLoadFacts, LoadFactsV2
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
@@ -78,6 +78,7 @@ __all__ = [
     "Metric",
     "GenerationBackend",
     "CaseScore",
+    "CaseScoreV2",
     "TemplateFamily",
     "RequestDraft",
     "RenderedRequest",

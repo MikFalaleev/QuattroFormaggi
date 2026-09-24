@@ -41,8 +41,8 @@ from qf.contracts import (
     SFTRecord,
     supported_versions,
 )
-from qf.domain import parse_sft_jsonl, parse_target
-from qf.eval.metrics import METRICS, score_prediction
+from qf.domain import get_target_schema, parse_sft_jsonl
+from qf.eval.metrics import METRICS, SCORERS, get_scorer
 from qf.eval.report import compare_runs, render_report
 from qf.eval.results import (
     EVAL_STATE_FILE,
@@ -76,8 +76,8 @@ __all__ = [
 PREDICTIONS_VERSION: Final = "predictions_v1"
 METRICS_VERSION: Final = "metrics_v1"
 COMPARE_FILE: Final = "compare.md"
-SCORED_SCHEMAS: Final = ("card_v1",)
-"""Answer schemas `score_prediction` understands; card_v2 is added in sub-step V6 (D-086)."""
+SCORED_SCHEMAS: Final = tuple(SCORERS.names())
+"""Answer schemas with a registered scorer (card_v1; card_v2 since sub-step V6)."""
 
 
 class GenerationSettings(StrictConfig):
@@ -210,9 +210,8 @@ def _state(cfg: EvalConfig, backend: GenerationBackend, bench: ArtifactRef,
         raise QFError("benchmark records have repeated ids")
     schema = _single(records, "answer schemas", lambda r: r.schema_version)
     if schema not in SCORED_SCHEMAS:
-        scored = ", ".join(SCORED_SCHEMAS)
-        raise QFError(f"answers in {schema} cannot be scored yet (scored: {scored}); "
-                      "card_v2 scoring arrives in sub-step V6")  # fmt: skip
+        raise QFError(f"answers in {schema} cannot be scored "
+                      f"(scored: {', '.join(SCORED_SCHEMAS)})")  # fmt: skip
     return {
         "name": cfg.name, "backend": backend.name, "model_id": backend.model_id(),
         "bench_path": bench.path.as_posix(), "bench_sha256": bench.sha256,
@@ -276,9 +275,10 @@ def run_eval(
             out.write(json.dumps(item, ensure_ascii=False) + "\n")
             out.flush()
             done[record.id] = item
+    scorer, schema = get_scorer(state["schema_version"]), get_target_schema(state["schema_version"])
     scores = [
-        score_prediction(r.id, parse_target(r.messages[2].content), done[r.id]["output"],
-                         generation_error=done[r.id]["error"])
+        scorer.score(r.id, schema.parse(r.messages[2].content), done[r.id]["output"],
+                     generation_error=done[r.id]["error"])
         for r in records
     ]  # fmt: skip
     table = metrics_table(records, scores, cfg.metrics, cfg.slices, cfg.bootstrap)

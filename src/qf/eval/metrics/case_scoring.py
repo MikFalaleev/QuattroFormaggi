@@ -7,9 +7,19 @@ error, or not even the lenient parse) is counted as failed, never skipped.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Final, cast, get_args
 
-from qf.contracts import CaseScore, ExtractionTarget, FieldName, Place, Quantity, ShipmentCard
+from qf.contracts import (
+    AnyFieldName,
+    CaseScore,
+    ExtractionTarget,
+    FieldName,
+    Place,
+    Quantity,
+    ShipmentCard,
+    ShipmentCardV2,
+)
 from qf.domain import TargetParseError, parse_target, parse_target_lenient, to_kg
 
 __all__ = [
@@ -17,7 +27,12 @@ __all__ = [
     "FIELDS",
     "KEY_FIELDS",
     "WEIGHT_TOLERANCE_KG",
+    "AnyCard",
     "card_mass_kg",
+    "is_computed_total",
+    "key_correct",
+    "parse_answer",
+    "scalar_critical_errors",
     "score_prediction",
     "values_match",
 ]
@@ -35,6 +50,8 @@ CRITICAL_ERRORS: Final = (
     "hallucinated_required_field",
     "missed_conflict",
 )
+AnyCard = ShipmentCard | ShipmentCardV2
+"""The scalar fields (everything but conditions) are the same in both card versions."""
 _UNIT_RATIOS: Final = (0.45359237, 1 / 0.45359237, 1000.0, 0.001)
 _RATIO_TOLERANCE: Final = 0.02
 
@@ -45,7 +62,7 @@ def _same_place(a: Place, b: Place) -> bool:
     )  # fmt: skip
 
 
-def values_match(field: FieldName, gold: Any, answer: Any) -> bool:
+def values_match(field: AnyFieldName, gold: Any, answer: Any) -> bool:
     """Weights by kg within 0.5 kg (the unit itself is not compared); places by city and
     region ignoring case and outer spaces; the shipper ignoring case and extra spaces; the
     rest exactly."""
@@ -60,7 +77,7 @@ def values_match(field: FieldName, gold: Any, answer: Any) -> bool:
     return bool(gold == answer)
 
 
-def card_mass_kg(card: ShipmentCard) -> float | None:
+def card_mass_kg(card: AnyCard) -> float | None:
     """Total mass stated by the card: weight_total, or weight_per_piece x pieces when both are
     given. Unlike `total_weight_kg` there is no default of one piece (D-050): a card without
     pieces has no stated mass."""
@@ -71,15 +88,19 @@ def card_mass_kg(card: ShipmentCard) -> float | None:
     return None
 
 
-def _parse(raw: str) -> tuple[bool, bool, ExtractionTarget | None]:
-    """(strict format ok, strictly valid, leniently parsed answer or None)."""
+def parse_answer(
+    raw: str, strict: Callable[[str], Any] = parse_target,
+    lenient: Callable[[str], Any] = parse_target_lenient,
+) -> tuple[bool, bool, Any]:  # fmt: skip
+    """(strict format ok, strictly valid, leniently parsed answer or None) with the parsers of
+    the answer schema."""
     try:
-        parse_target(raw)
+        strict(raw)
         json_parsed, schema_valid = True, True
     except TargetParseError as exc:
         json_parsed, schema_valid = exc.stage == "schema", False
     try:
-        return json_parsed, schema_valid, parse_target_lenient(raw)
+        return json_parsed, schema_valid, lenient(raw)
     except TargetParseError:
         return json_parsed, schema_valid, None
 
@@ -105,7 +126,8 @@ def _numbers(quantity: Quantity | None) -> set[float]:
     return set() if quantity is None else {float(quantity.value)}
 
 
-def _critical(gold: ShipmentCard, answer: ShipmentCard) -> list[str]:
+def scalar_critical_errors(gold: AnyCard, answer: AnyCard) -> list[str]:
+    """Swaps and unit mistakes of the fields both card versions share."""
     errors = []
     gold_weights = _numbers(gold.weight_total) | _numbers(gold.weight_per_piece)
     answer_weights = _numbers(answer.weight_total) | _numbers(answer.weight_per_piece)
@@ -135,13 +157,13 @@ def score_prediction(
 ) -> CaseScore:
     """Score one answer. Fields are compared on the lenient parse; `missing_*` against the gold
     list as sets (never recomputed from the answer's card)."""
-    json_parsed, schema_valid, answer = _parse(raw_output)
+    json_parsed, schema_valid, answer = parse_answer(raw_output)
     if generation_error is not None or answer is None:
         return _failed(record_id, gold, (json_parsed, schema_valid), generation_error)
     g, a = gold.card, answer.card
     conflict_fields = {c.field for c in gold.conflicts}
-    field_correct: dict[FieldName, bool | None] = {}
-    hallucinated: list[FieldName] = []
+    field_correct: dict[AnyFieldName, bool | None] = {}
+    hallucinated: list[AnyFieldName] = []
     critical: list[str] = []
     notes: list[str] = []
     for field in FIELDS:
@@ -152,7 +174,7 @@ def score_prediction(
             field_correct[field] = False
             if field in conflict_fields:
                 critical.append("missed_conflict")
-            elif field == "weight_total" and _is_computed_total(g, answer_value):
+            elif field == "weight_total" and is_computed_total(g, answer_value):
                 notes.append("computed_weight_total")
             else:
                 hallucinated.append(field)
@@ -162,13 +184,13 @@ def score_prediction(
     # answer states a value: e.g. temperature_c of a reefer, but not of a dry van
     if any(f in gold.missing_fields for f in hallucinated):
         critical.append("hallucinated_required_field")
-    critical += _critical(g, a)
+    critical += scalar_critical_errors(g, a)
     gold_missing, answer_missing = set(gold.missing_fields), set(answer.missing_fields)
     detected = conflict_fields <= {c.field for c in answer.conflicts} if conflict_fields else None
     return CaseScore(
         record_id=record_id, json_parsed=json_parsed, schema_valid=schema_valid,
         json_parsed_lenient=True, generation_error=None, field_correct=field_correct,
-        key_fields_correct=_key_correct(g, a, field_correct),
+        key_fields_correct=key_correct(g, a, field_correct),
         missing_tp=len(gold_missing & answer_missing),
         missing_fp=len(answer_missing - gold_missing),
         missing_fn=len(gold_missing - answer_missing),
@@ -177,8 +199,8 @@ def score_prediction(
     )  # fmt: skip
 
 
-def _key_correct(
-    gold: ShipmentCard, answer: ShipmentCard, field_correct: dict[FieldName, bool | None]
+def key_correct(
+    gold: AnyCard, answer: AnyCard, field_correct: dict[AnyFieldName, bool | None]
 ) -> bool | None:
     """All key fields and the stated mass right; None if any of them is null in the gold."""
     gold_mass = card_mass_kg(gold)
@@ -189,7 +211,7 @@ def _key_correct(
     return mass_ok and all(field_correct[f] for f in KEY_FIELDS)
 
 
-def _is_computed_total(gold: ShipmentCard, answer_total: Quantity) -> bool:
+def is_computed_total(gold: AnyCard, answer_total: Quantity) -> bool:
     """The answer multiplied the per-piece weight out: wrong field, but not an invented value."""
     mass = card_mass_kg(gold)
     return gold.weight_per_piece is not None and mass is not None and (

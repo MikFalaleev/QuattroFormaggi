@@ -6,21 +6,25 @@ The metric names come from the run (its config); this module holds no list of me
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Sequence
 from typing import Any, Final
 
+from pydantic import BaseModel
+
 from qf.common import QFError
-from qf.contracts import CaseScore, ExtractionTarget, FieldName, Place, Quantity, SFTRecord
-from qf.domain import TargetParseError, parse_target, parse_target_lenient
-from qf.eval.metrics import CRITICAL_ERRORS, FIELDS, METRICS
+from qf.contracts import AnyFieldName, CaseScore, Place, Quantity, SFTRecord
+from qf.domain import TargetParseError, TargetSchema, get_target_schema
+from qf.eval.metrics import METRICS, Scorer, get_scorer
 from qf.eval.results import EvalRun
-from qf.eval.slices import record_kind
+from qf.eval.slices import record_kind, slice_of
 from qf.eval.stats import mcnemar, paired_bootstrap_diff, resample_indices
 
 __all__ = [
     "COMPARABLE_KEYS",
     "FAKE_BANNER",
+    "MOCK_WARNING",
     "SYNTHETIC_WARNING",
     "compare_runs",
     "render_report",
@@ -33,6 +37,11 @@ FAKE_BANNER: Final = (
 SYNTHETIC_WARNING: Final = (
     "benchmark полностью синтетический и шаблонный; качество на реальных заявках не измерено"
 )
+MOCK_WARNING: Final = (
+    "benchmark синтетический: шаблонные заявки и заявки-моки, написанные агентом (D-103); "
+    "качество на реальных заявках не измерено"
+)
+"""Instead of SYNTHETIC_WARNING when the synthetic benchmark holds mocks (not templates)."""
 # Runs are comparable only on the same benchmark, prompt and answer schema (docs/EVAL_SPEC.md).
 COMPARABLE_KEYS: Final = ("bench_sha256", "prompt_sha256", "schema_version")
 TOP_FAILURES: Final = 20
@@ -94,27 +103,24 @@ def _error_counter(error: str) -> Callable[[CaseScore], int]:
     return lambda s: 0 if s.failed else s.critical_errors.count(error)
 
 
-def _critical_by_kind(records: Sequence[SFTRecord], scores: Sequence[CaseScore]) -> list[str]:
-    """Counts of each critical error per kind of case; failed answers are not assessable. The
-    hard slice of the release gates is every case with a hard case: missing + hard."""
+def _critical_by_kind(records: Sequence[SFTRecord], scores: Sequence[CaseScore],
+                      scorer: Scorer) -> list[str]:  # fmt: skip
+    """Counts of each critical error per kind of case (the columns of the schema's scorer);
+    failed answers are not assessable. The hard slice of the release gates: card_v1 — missing +
+    hard (D-079), card_v2 — everything but clean (D-085)."""
     kinds = {r.id: record_kind(r) for r in records}
-    columns = {"clean": {"clean"}, "missing": {"missing"}, "hard": {"hard"},
-               "трудные (missing + hard)": {"missing", "hard"},
-               "всего": {"clean", "missing", "hard"}}  # fmt: skip
+    columns = dict(scorer.kind_columns)
     lines = [
-        "## Критические ошибки по видам кейсов", "",
-        "clean — чистые заявки, missing — выпавшие поля, hard — остальные трудные случаи; "
-        "трудный срез gates — missing + hard. Неуспешные ответы не оцениваются (строка "
-        "«не оценено»).", "",
+        "## Критические ошибки по видам кейсов", "", scorer.kinds_note, "",
         "| Ошибка | " + " | ".join(columns) + " |", "|---|" + "---:|" * len(columns),
     ]  # fmt: skip
 
     def row(label: str, count: Callable[[CaseScore], int]) -> str:
-        cells = [sum(count(s) for s in scores if kinds[s.record_id] in groups)
+        cells = [sum(count(s) for s in scores if groups is None or kinds[s.record_id] in groups)
                  for groups in columns.values()]  # fmt: skip
         return f"| {label} | " + " | ".join(map(str, cells)) + " |"
 
-    for error in CRITICAL_ERRORS:
+    for error in scorer.critical_errors:
         lines.append(row(f"`{error}`", _error_counter(error)))
     lines.append(row("не оценено", lambda s: int(s.failed)))
     return lines
@@ -139,35 +145,40 @@ def _readable(value: Any) -> str:
         return f"{_number(float(value.value))} {value.unit}"
     if isinstance(value, Place):
         return f"{value.city} ({value.region})"
+    if isinstance(value, list):  # special conditions of card_v2
+        return "[" + "; ".join(json.dumps(item.model_dump(mode="json"), ensure_ascii=False)
+                               if isinstance(item, BaseModel) else str(item)
+                               for item in value) + "]"  # fmt: skip
     return str(value)
 
 
-def _answer(raw: str) -> ExtractionTarget | None:
+def _answer(raw: str, schema: TargetSchema[Any]) -> Any:
     try:
-        return parse_target_lenient(raw)
+        return schema.parse_lenient(raw)
     except TargetParseError:
         return None
 
 
-def _format_problem(raw: str) -> str | None:
+def _format_problem(raw: str, schema: TargetSchema[Any]) -> str | None:
     try:
-        parse_target(raw)
+        schema.parse(raw)
     except TargetParseError as exc:
         return f"строгий разбор не прошёл ({exc.stage}): {exc}"
     return None
 
 
-def _problems(score: CaseScore, gold: ExtractionTarget, raw: str) -> list[str]:
+def _problems(score: CaseScore, gold: Any, raw: str, schema: TargetSchema[Any],
+              fields: Sequence[AnyFieldName]) -> list[str]:  # fmt: skip
     problems = []
     if score.generation_error is not None:
         problems.append(f"ошибка генерации: {score.generation_error}")
-    elif (format_problem := _format_problem(raw)) is not None:
+    elif (format_problem := _format_problem(raw, schema)) is not None:
         problems.append(format_problem)
     if score.critical_errors:
         problems.append("критические ошибки: " + ", ".join(score.critical_errors))
-    answer = _answer(raw)
+    answer = _answer(raw, schema)
     if answer is not None:
-        wrong: list[FieldName] = [f for f in FIELDS if score.field_correct.get(f) is False]
+        wrong = [f for f in fields if score.field_correct.get(f) is False]
         for field in wrong:
             gold_value, answer_value = getattr(gold.card, field), getattr(answer.card, field)
             problems.append(f"`{field}`: эталон {_readable(gold_value)} → "
@@ -196,8 +207,9 @@ def _severity(score: CaseScore) -> tuple[int, int, int, int]:
             int(not score.missing_exact) + int(not score.schema_valid))  # fmt: skip
 
 
-def _failures(run: EvalRun) -> list[str]:
+def _failures(run: EvalRun, scorer: Scorer) -> list[str]:
     records = {r.id: r for r in run.records}
+    schema = get_target_schema(scorer.version)
     ranked = sorted((s for s in run.scores if any(_severity(s))), key=_severity, reverse=True)
     lines = [f"## Худшие кейсы (топ-{TOP_FAILURES} из {len(ranked)} с ошибками)", "",
              "Порядок: неуспешные ответы, затем по числу критических ошибок, неверных полей, "
@@ -205,12 +217,12 @@ def _failures(run: EvalRun) -> list[str]:
     for n, score in enumerate(ranked[:TOP_FAILURES], start=1):
         record = records[score.record_id]
         raw = run.predictions[score.record_id]["output"]
-        gold = parse_target(record.messages[2].content)
-        hard = ",".join(record.variant.hard_cases) or "clean"
+        gold = schema.parse(record.messages[2].content)
+        hard = slice_of(record, "hard_case")
         excerpt = raw if len(raw) <= OUTPUT_EXCERPT else raw[:OUTPUT_EXCERPT] + " …"
         lines += ["", f"### {n}. `{score.record_id}` — {hard}, {record.template_family}, "
                       f"{record.language}", "",
-                  *(f"- {p}" for p in _problems(score, gold, raw)), "",
+                  *(f"- {p}" for p in _problems(score, gold, raw, schema, scorer.fields)), "",
                   "Заявка:", "", *_code_block(record.messages[1].content), "",
                   "Ответ:", "", *_code_block(excerpt or "(пусто)")]  # fmt: skip
     return lines
@@ -218,14 +230,17 @@ def _failures(run: EvalRun) -> list[str]:
 
 def render_report(run: EvalRun) -> str:
     """The report of one run: header, metrics with CI, critical errors, slices, worst cases."""
+    scorer = get_scorer(run.state["schema_version"])
     lines = [f"# Оценка: {run.state['name']}", ""]
     if run.state["backend"] == "fake":
         lines += [FAKE_BANNER, ""]
     if run.records and all(r.synthetic for r in run.records):
-        lines += [f"> {SYNTHETIC_WARNING}.", ""]
+        mocks = any(r.template_family == "manual_mock" for r in run.records)
+        lines += [f"> {MOCK_WARNING if mocks else SYNTHETIC_WARNING}.", ""]
     lines += [*_header(run), "", *_overall(run.table), "",
-              *_critical_by_kind(run.records, run.scores), "",
-              *_slices(run.table, run.state["slice_metrics"]), "", *_failures(run)]  # fmt: skip
+              *_critical_by_kind(run.records, run.scores, scorer), "",
+              *_slices(run.table, run.state["slice_metrics"]), "",
+              *_failures(run, scorer)]  # fmt: skip
     return "\n".join(lines) + "\n"
 
 
