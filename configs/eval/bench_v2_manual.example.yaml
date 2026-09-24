@@ -18,6 +18,8 @@
 #   {kind: oversize, length: {value: 9.5, unit: m}, width: null, height: {value: 360, unit: cm}}
 #   {kind: sensors, parameters: [temperature, humidity, pressure, tilt, shock, door_opening]}
 # Условие названо без значений («нужна особая упаковка») — пустой список или null у значений.
+# provenance: real (по умолчанию) — настоящая заявка; mock — написана как настоящая, но ею не является
+# (запись будет synthetic, семейство manual_mock; пример — bench_v2_mock.yaml, D-103).
 - author: example
   language: ru
   request_date: 2026-09-20

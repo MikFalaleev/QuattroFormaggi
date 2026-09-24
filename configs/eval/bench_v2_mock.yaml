@@ -1,0 +1,783 @@
+# Заявки-моки для bench_v2 (D-103): НЕ настоящие заявки. Их написал агент 24.09.2026 по поручению
+# пользователя («Настоящие заявки: напиши сам моки»); эталонные карточки тоже разметил агент,
+# недостающие поля и каноническую форму ответа посчитал код. Тот же агент писал промпт и
+# генератор, поэтому у моков могут быть общие с ними слепые пятна. Моки проверяют устойчивость к
+# формулировкам не из шаблонов (сокращения городов, чат, пересланные письма, ставки и номера), но
+# качество на настоящих заявках они не измеряют. В записях они synthetic, семейство manual_mock.
+# Формат — как в bench_v2_manual.example.yaml; заморозка:
+#   uv run qf bench freeze --config configs/eval/benchmark_v2.yaml --manual configs/eval/bench_v2_mock.yaml
+# Компании вымышленные, персональных данных нет.
+
+# --- 1. Рефрижератор с режимом и термописцем, «Мск – Питер», ставка и время как посторонние числа
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Добрый день!
+    Прошу рассчитать и подать реф Мск – Питер.
+    Груз: молочная продукция, 20 паллет, вес брутто 14,2 т.
+    Режим +2…+4 °C, в машине обязательно термописец, распечатку отдать водителю на выгрузке.
+    Загрузка 29.09.2026 с 8:00, выгрузка 30.09.2026.
+    Грузоотправитель — ООО «Молочный двор».
+    Ставку ориентируем 95 000 руб. с НДС.
+  card:
+    shipper_name: ООО «Молочный двор»
+    cargo_category: food_beverage
+    equipment_type: reefer
+    pieces: 20
+    weight_total: {value: 14.2, unit: t}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Санкт-Петербург, region: Санкт-Петербург}
+    pickup_date: 2026-09-29
+    delivery_date: 2026-09-30
+    special_conditions:
+      - {kind: temperature, min_c: 2, max_c: 4}
+      - {kind: sensors, parameters: [temperature]}
+
+# --- 2. Чат перевозчиков: строчные буквы, «екб», «пал», «тнп», «завтра»
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-22
+  text: |
+    екб - казань, фура. груз тнп 33 пал / 20т. грузимся завтра с утра, кто свободен - пишите, ставка 120к
+  card:
+    shipper_name: null
+    cargo_category: consumer_goods
+    equipment_type: tent
+    pieces: 33
+    weight_total: {value: 20, unit: t}
+    weight_per_piece: null
+    origin: {city: Екатеринбург, region: Свердловская область}
+    destination: {city: Казань, region: Республика Татарстан}
+    pickup_date: 2026-09-23
+    delivery_date: null
+    special_conditions: []
+
+# --- 3. Трал с полными габаритами (м и см), цепи и упоры, год выпуска как постороннее число
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Нужен трал. Экскаватор гусеничный 2019 г. в., 1 ед., масса 32 т.
+    Габариты: длина 11,2 м, ширина 3,15 м, высота 340 см.
+    Крепление цепями, под гусеницы — противооткатные упоры.
+    Погрузка 01.10.2026, Челябинск, выгрузка в Омске.
+    Отправитель АО «УралСтройМех».
+  card:
+    shipper_name: АО «УралСтройМех»
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 32, unit: t}
+    weight_per_piece: null
+    origin: {city: Челябинск, region: Челябинская область}
+    destination: {city: Омск, region: Омская область}
+    pickup_date: 2026-10-01
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [chains, wheel_chocks]}
+      - kind: oversize
+        length: {value: 11.2, unit: m}
+        width: {value: 3.15, unit: m}
+        height: {value: 340, unit: cm}
+
+# --- 4. Трал, названы два габарита из трёх; «послезавтра»; «2 дня» — постороннее число
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Добрый день. Требуется низкорамный трал Новосибирск — Томск, бульдозер 18 т, 1 шт.
+    Габариты: длина 6,8 м, высота 3,2 м.
+    Погрузка послезавтра. Оплата безнал, 2 дня.
+  card:
+    shipper_name: null
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 18, unit: t}
+    weight_per_piece: null
+    origin: {city: Новосибирск, region: Новосибирская область}
+    destination: {city: Томск, region: Томская область}
+    pickup_date: 2026-09-25
+    delivery_date: null
+    special_conditions:
+      - kind: oversize
+        length: {value: 6.8, unit: m}
+        width: null
+        height: {value: 3.2, unit: m}
+
+# --- 5. Трал без габаритов: условия нет, код спросит габариты
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Нужен трал под каток дорожный (1 единица), вес 12 т.
+    Самара — Уфа, погрузка 28.09.2026.
+    Отправитель ООО «ДорТехника».
+  card:
+    shipper_name: ООО «ДорТехника»
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 12, unit: t}
+    weight_per_piece: null
+    origin: {city: Самара, region: Самарская область}
+    destination: {city: Уфа, region: Республика Башкортостан}
+    pickup_date: 2026-09-28
+    delivery_date: null
+    special_conditions: []
+
+# --- 6. Рефрижератор без температуры: условия нет, код спросит режим
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Нужен реф Краснодар — Москва, фрукты, 18 паллет, 16 т. Загрузка 26.09.2026.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: reefer
+    pieces: 18
+    weight_total: {value: 16, unit: t}
+    weight_per_piece: null
+    origin: {city: Краснодар, region: Краснодарский край}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-26
+    delivery_date: null
+    special_conditions: []
+
+# --- 7. Изотерм, «не выше +25», номер заказа, масса в кг с пробелом
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-22
+  text: |
+    Заказ № 7713. Изотерм, Воронеж → Москва, кондитерские изделия, 12 паллет, 8 500 кг.
+    Температура не выше +25 °C. Загрузка 25.09.2026.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: isotherm
+    pieces: 12
+    weight_total: {value: 8500, unit: kg}
+    weight_per_piece: null
+    origin: {city: Воронеж, region: Воронежская область}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-25
+    delivery_date: null
+    special_conditions:
+      - {kind: temperature, min_c: null, max_c: 25}
+
+# --- 8. Цельномет, «из Нижнего», упаковка названа описанием груза, дата выгрузки
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Здравствуйте! Нужен цельномет из Нижнего в Казань.
+    Электроника, 6 мест, общий вес 1,2 т. Всё в обрешётке и стрейч-плёнке, кузов чистый.
+    Забираем 30.09.2026, сдать 01.10.2026.
+    Отправитель: ООО «Техносклад».
+  card:
+    shipper_name: ООО «Техносклад»
+    cargo_category: electronics
+    equipment_type: van
+    pieces: 6
+    weight_total: {value: 1.2, unit: t}
+    weight_per_piece: null
+    origin: {city: Нижний Новгород, region: Нижегородская область}
+    destination: {city: Казань, region: Республика Татарстан}
+    pickup_date: 2026-09-30
+    delivery_date: 2026-10-01
+    special_conditions:
+      - {kind: packaging, types: [crate, stretch_film]}
+
+# --- 9. Мега с объёмом (постороннее число), получатель — не отправитель
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Коллеги, добрый день.
+    Требуется мега (объём 100 м³) Пермь – Екб. Груз — товары для розничной сети, 34 паллеты, 11 т,
+    паллеты не штабелируются. Загрузка 27.09.2026.
+    Грузоотправитель ООО «Корзинка». Получатель — РЦ «Восток».
+  card:
+    shipper_name: ООО «Корзинка»
+    cargo_category: retail
+    equipment_type: mega
+    pieces: 34
+    weight_total: {value: 11, unit: t}
+    weight_per_piece: null
+    origin: {city: Пермь, region: Пермский край}
+    destination: {city: Екатеринбург, region: Свердловская область}
+    pickup_date: 2026-09-27
+    delivery_date: null
+    special_conditions: []
+
+# --- 10. Контейнеровоз, 40 футов и «без ADR» — не поля карточки; «сегодня»
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Срочно! Нужен контейнеровоз под 40-футовый контейнер, Краснодар — Ростов-на-Дону, забрать сегодня.
+    Внутри автозапчасти: 24 паллеты, 18 т брутто. Груз не опасный, без ADR.
+  card:
+    shipper_name: null
+    cargo_category: automotive
+    equipment_type: container
+    pieces: 24
+    weight_total: {value: 18, unit: t}
+    weight_per_piece: null
+    origin: {city: Краснодар, region: Краснодарский край}
+    destination: {city: Ростов-на-Дону, region: Ростовская область}
+    pickup_date: 2026-09-24
+    delivery_date: null
+    special_conditions: []
+
+# --- 11. Бортовая площадка, негабарит по длине, ремни; «по 2 на пачку» — постороннее число
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Нужна бортовая площадка Тула → Воронеж.
+    8 пачек, общий вес 19 т. Негабарит по длине: 15 м (свес за борт).
+    Крепить ремнями, по 2 на пачку. Погрузка 02.10.2026.
+  card:
+    shipper_name: null
+    cargo_category: null
+    equipment_type: flatbed
+    pieces: 8
+    weight_total: {value: 19, unit: t}
+    weight_per_piece: null
+    origin: {city: Тула, region: Тульская область}
+    destination: {city: Воронеж, region: Воронежская область}
+    pickup_date: 2026-10-02
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [straps]}
+      - {kind: oversize, length: {value: 15, unit: m}, width: null, height: null}
+
+# --- 12. Противоречие в количестве мест (22 и 24 в спецификации)
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Тент, Мск — Тула, 26.09.2026. Грузим 22 паллеты, 10 т.
+    Товары для ритейла, отправитель ООО «Альфа-Трейд».
+    P.S. В спецификации клиента указано 24 паллеты — уточняю.
+  card:
+    shipper_name: ООО «Альфа-Трейд»
+    cargo_category: retail
+    equipment_type: tent
+    pieces: null
+    weight_total: {value: 10, unit: t}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Тула, region: Тульская область}
+    pickup_date: 2026-09-26
+    delivery_date: null
+    special_conditions: []
+  conflicts:
+    - {field: pieces, values: [22, 24]}
+
+# --- 13. Противоречие в массе (7,5 т и 8 т по ТТН), «фургон»
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Добрый вечер! Фургон Самара — Казань, 28.09.2026. 14 мест, вес 7,5 т.
+    Отправитель ООО «Волга-Пак».
+    UPD: по ТТН вес 8 т, какой верный — выясняю.
+  card:
+    shipper_name: ООО «Волга-Пак»
+    cargo_category: null
+    equipment_type: van
+    pieces: 14
+    weight_total: null
+    weight_per_piece: null
+    origin: {city: Самара, region: Самарская область}
+    destination: {city: Казань, region: Республика Татарстан}
+    pickup_date: 2026-09-28
+    delivery_date: null
+    special_conditions: []
+  conflicts:
+    - field: weight_total
+      values: [{value: 7.5, unit: t}, {value: 8, unit: t}]
+
+# --- 14. Масса одного места («по 650 кг»), «без режима» — условия нет
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Шторный полуприцеп Уфа – Челябинск. 10 паллет по 650 кг, продукты питания (сухие, без режима).
+    Загрузка 29.09.2026, доставка 30.09.2026.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: tent
+    pieces: 10
+    weight_total: null
+    weight_per_piece: {value: 650, unit: kg}
+    origin: {city: Уфа, region: Республика Башкортостан}
+    destination: {city: Челябинск, region: Челябинская область}
+    pickup_date: 2026-09-29
+    delivery_date: 2026-09-30
+    special_conditions: []
+
+# --- 15. Амортизирующая упаковка и датчики наклона и удара, «СПб»
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Нужен цельномет Москва – СПб. Электроника (серверы), 4 места, 900 кг.
+    Упаковка амортизирующая, в кузове датчики наклона и удара, данные передать получателю.
+    Погрузка 01.10.2026. Грузоотправитель ООО «ДатаЛайн Сервис».
+  card:
+    shipper_name: ООО «ДатаЛайн Сервис»
+    cargo_category: electronics
+    equipment_type: van
+    pieces: 4
+    weight_total: {value: 900, unit: kg}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Санкт-Петербург, region: Санкт-Петербург}
+    pickup_date: 2026-10-01
+    delivery_date: null
+    special_conditions:
+      - {kind: packaging, types: [shock_protection]}
+      - {kind: sensors, parameters: [tilt, shock]}
+
+# --- 16. Температурный режим назван без цифр
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Изотерм Барнаул — Новосибирск, 30.09.2026. Шоколад, 16 паллет, 9 т.
+    Нужен температурный режим, цифры пришлю отдельно.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: isotherm
+    pieces: 16
+    weight_total: {value: 9, unit: t}
+    weight_per_piece: null
+    origin: {city: Барнаул, region: Алтайский край}
+    destination: {city: Новосибирск, region: Новосибирская область}
+    pickup_date: 2026-09-30
+    delivery_date: null
+    special_conditions:
+      - {kind: temperature, min_c: null, max_c: null}
+
+# --- 17. Крепление названо без способа
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Добрый день, тент Самара — Нижний Новгород, автокомпоненты, 12 мест, 6 т, погрузка 02.10.2026.
+    Груз тяжёлый, нужно надёжное крепление.
+  card:
+    shipper_name: null
+    cargo_category: automotive
+    equipment_type: tent
+    pieces: 12
+    weight_total: {value: 6, unit: t}
+    weight_per_piece: null
+    origin: {city: Самара, region: Самарская область}
+    destination: {city: Нижний Новгород, region: Нижегородская область}
+    pickup_date: 2026-10-02
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: []}
+
+# --- 18. Реф на −18 «на завтра», датчики названы без параметров
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Нужен реф на завтра, Омск — Новосибирск. Замороженные овощи, 20 паллет, 15 т, режим -18 °C.
+    Машина с датчиками, каких именно — клиент уточнит.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: reefer
+    pieces: 20
+    weight_total: {value: 15, unit: t}
+    weight_per_piece: null
+    origin: {city: Омск, region: Омская область}
+    destination: {city: Новосибирск, region: Новосибирская область}
+    pickup_date: 2026-09-24
+    delivery_date: null
+    special_conditions:
+      - {kind: temperature, min_c: -18, max_c: -18}
+      - {kind: sensors, parameters: []}
+
+# --- 19. Условия в разных местах письма: ремни и влагозащитная упаковка
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Здравствуйте. Кемерово → Красноярск, тент.
+    Загрузка 29.09.2026, выгрузка 01.10.2026.
+    Крепление ремнями обязательно.
+    15 мест, 4,3 т.
+    Коробки во влагозащитной упаковке, под дождём не держать.
+  card:
+    shipper_name: null
+    cargo_category: null
+    equipment_type: tent
+    pieces: 15
+    weight_total: {value: 4.3, unit: t}
+    weight_per_piece: null
+    origin: {city: Кемерово, region: Кемеровская область — Кузбасс}
+    destination: {city: Красноярск, region: Красноярский край}
+    pickup_date: 2026-09-29
+    delivery_date: 2026-10-01
+    special_conditions:
+      - {kind: securing, methods: [straps]}
+      - {kind: packaging, types: [moisture_protection]}
+
+# --- 20. Заявка-бланк с номером, ставкой, НДС и отсрочкой
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-22
+  text: |
+    Заявка № 2026/118
+    Маршрут: Тула — Воронеж
+    Груз: пряники, 18 паллет, 9 т
+    ТС: тент
+    Дата загрузки: 25.09.2026
+    Грузоотправитель: ООО «Тульский пряник»
+    Ставка: 68 000 ₽ с НДС 20%, отсрочка 14 дней
+  card:
+    shipper_name: ООО «Тульский пряник»
+    cargo_category: food_beverage
+    equipment_type: tent
+    pieces: 18
+    weight_total: {value: 9, unit: t}
+    weight_per_piece: null
+    origin: {city: Тула, region: Тульская область}
+    destination: {city: Воронеж, region: Воронежская область}
+    pickup_date: 2026-09-25
+    delivery_date: null
+    special_conditions: []
+
+# --- 21. Пересланное письмо: заявка клиента под припиской коллегам
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Коллеги, есть свободная мега? Ниже заявка клиента.
+
+    -------- Пересланное сообщение --------
+    Тема: перевозка СПб – Москва
+    Добрый день! Нужна мега из Санкт-Петербурга в Москву, 33 паллеты, 12 т, товары для розничных
+    сетей. Загрузка 26.09.2026. Отправитель — ООО «Невский Ритейл».
+    --
+    Отдел логистики
+  card:
+    shipper_name: ООО «Невский Ритейл»
+    cargo_category: retail
+    equipment_type: mega
+    pieces: 33
+    weight_total: {value: 12, unit: t}
+    weight_per_piece: null
+    origin: {city: Санкт-Петербург, region: Санкт-Петербург}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-26
+    delivery_date: null
+    special_conditions: []
+
+# --- 22. EN: reefer, диапазон температуры и логгер
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-24
+  text: |
+    Hello team,
+    We need a reefer from Kazan to Moscow on September 29, 2026.
+    Cargo: dairy products, 26 pallets, 19,500 kg gross.
+    Temperature +2 to +8 °C, temperature logger required.
+    Shipper: Volga Dairy LLC.
+    Thanks!
+  card:
+    shipper_name: Volga Dairy LLC
+    cargo_category: food_beverage
+    equipment_type: reefer
+    pieces: 26
+    weight_total: {value: 19500, unit: kg}
+    weight_per_piece: null
+    origin: {city: Казань, region: Республика Татарстан}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-29
+    delivery_date: null
+    special_conditions:
+      - {kind: temperature, min_c: 2, max_c: 8}
+      - {kind: sensors, parameters: [temperature]}
+
+# --- 23. EN: lowboy «tomorrow», все габариты в сантиметрах, цепи
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-25
+  text: |
+    Hi, looking for a lowboy tomorrow, Yekaterinburg to Chelyabinsk. One wheel loader, 23 t.
+    Dimensions: length 820 cm, width 290 cm, height 355 cm. Chains for securing. No escort needed.
+  card:
+    shipper_name: null
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 23, unit: t}
+    weight_per_piece: null
+    origin: {city: Екатеринбург, region: Свердловская область}
+    destination: {city: Челябинск, region: Челябинская область}
+    pickup_date: 2026-09-26
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [chains]}
+      - kind: oversize
+        length: {value: 820, unit: cm}
+        width: {value: 290, unit: cm}
+        height: {value: 355, unit: cm}
+
+# --- 24. EN: box van, две упаковки, даты ISO, ставка в долларах
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-25
+  text: |
+    Need a box van St. Petersburg → Nizhny Novgorod. Electronics, 8 pallets, 3.2 t total.
+    Pallets must be stretch-wrapped and in moisture-proof packaging.
+    Pick up 2026-10-01, deliver 2026-10-03. Rate: 1,450 USD.
+  card:
+    shipper_name: null
+    cargo_category: electronics
+    equipment_type: van
+    pieces: 8
+    weight_total: {value: 3.2, unit: t}
+    weight_per_piece: null
+    origin: {city: Санкт-Петербург, region: Санкт-Петербург}
+    destination: {city: Нижний Новгород, region: Нижегородская область}
+    pickup_date: 2026-10-01
+    delivery_date: 2026-10-03
+    special_conditions:
+      - {kind: packaging, types: [stretch_film, moisture_protection]}
+
+# --- 25. EN: container truck, 20 футов — не поле; противоречие в массе
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-25
+  text: |
+    Container truck needed for a 20ft box, Novosibirsk to Omsk, October 2, 2026.
+    Auto parts, 12 pallets, 9 t. Note: the invoice shows 9.6 t, checking which one is correct.
+  card:
+    shipper_name: null
+    cargo_category: automotive
+    equipment_type: container
+    pieces: 12
+    weight_total: null
+    weight_per_piece: null
+    origin: {city: Новосибирск, region: Новосибирская область}
+    destination: {city: Омск, region: Омская область}
+    pickup_date: 2026-10-02
+    delivery_date: null
+    special_conditions: []
+  conflicts:
+    - field: weight_total
+      values: [{value: 9, unit: t}, {value: 9.6, unit: t}]
+
+# --- 26. EN: mega trailer, масса одного места («450 kg each»), «Two drops» — постороннее
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-24
+  text: |
+    Mega trailer, Moscow – Voronezh, pickup Sept 30, 2026. 33 pallets of retail goods, 450 kg each.
+    Shipper: North Star Retail. Two drops are not possible, single delivery point.
+  card:
+    shipper_name: North Star Retail
+    cargo_category: retail
+    equipment_type: mega
+    pieces: 33
+    weight_total: null
+    weight_per_piece: {value: 450, unit: kg}
+    origin: {city: Москва, region: Москва}
+    destination: {city: Воронеж, region: Воронежская область}
+    pickup_date: 2026-09-30
+    delivery_date: null
+    special_conditions: []
+
+# --- 27. EN: flatbed, негабарит по длине, ремни и антискользящие коврики
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-25
+  text: |
+    Flatbed required Krasnodar → Volgograd on 3 October 2026. 6 bundles, 21 t total.
+    Oversize: length 14 m. Securing: straps and anti-slip mats.
+  card:
+    shipper_name: null
+    cargo_category: null
+    equipment_type: flatbed
+    pieces: 6
+    weight_total: {value: 21, unit: t}
+    weight_per_piece: null
+    origin: {city: Краснодар, region: Краснодарский край}
+    destination: {city: Волгоград, region: Волгоградская область}
+    pickup_date: 2026-10-03
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [straps, anti_slip_mats]}
+      - {kind: oversize, length: {value: 14, unit: m}, width: null, height: null}
+
+# --- 28. Короткое сообщение: «машинка», «питер-мск», «палл», «послезавтра», «+15..+18»
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    нужна машинка изотерм питер-мск, 5 палл, 2т, на послезавтра. темп +15..+18
+  card:
+    shipper_name: null
+    cargo_category: null
+    equipment_type: isotherm
+    pieces: 5
+    weight_total: {value: 2, unit: t}
+    weight_per_piece: null
+    origin: {city: Санкт-Петербург, region: Санкт-Петербург}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-26
+    delivery_date: null
+    special_conditions:
+      - {kind: temperature, min_c: 15, max_c: 18}
+
+# --- 29. Машина под контейнер, номер пломбы — постороннее число, контроль открытия дверей
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-23
+  text: |
+    Добрый день! Нужна машина под контейнер, Москва — Екатеринбург. ТНП, 20 мест, 7 т.
+    Контейнер опломбирован (пломба № 334455), нужен контроль открытия дверей в пути.
+    Отправитель — ООО «Логистик-Плюс». Загрузка 28.09.2026.
+  card:
+    shipper_name: ООО «Логистик-Плюс»
+    cargo_category: consumer_goods
+    equipment_type: container
+    pieces: 20
+    weight_total: {value: 7, unit: t}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Екатеринбург, region: Свердловская область}
+    pickup_date: 2026-09-28
+    delivery_date: null
+    special_conditions:
+      - {kind: sensors, parameters: [door_opening]}
+
+# --- 30. Мега-тент без даты и без количества мест
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Ищем мега-тент Москва — Самара, товары для ритейла, 15 т. Дату загрузки согласуем.
+  card:
+    shipper_name: null
+    cargo_category: retail
+    equipment_type: mega
+    pieces: null
+    weight_total: {value: 15, unit: t}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Самара, region: Самарская область}
+    pickup_date: null
+    delivery_date: null
+    special_conditions: []
+
+# --- 31. Неизвестны место загрузки и тип транспорта
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-24
+  text: |
+    Добрый день! Нужна машина до Краснодара: консервы, 12 паллет, 10 т, загрузка 30.09.2026.
+    Место загрузки сообщу позже.
+  card:
+    shipper_name: null
+    cargo_category: food_beverage
+    equipment_type: null
+    pieces: 12
+    weight_total: {value: 10, unit: t}
+    weight_per_piece: null
+    origin: null
+    destination: {city: Краснодар, region: Краснодарский край}
+    pickup_date: 2026-09-30
+    delivery_date: null
+    special_conditions: []
+
+# --- 32. EN: tilt trailer, масса не указана
+- author: agent
+  provenance: mock
+  language: en
+  request_date: 2026-09-23
+  text: |
+    Tilt trailer needed Tula → Moscow, 14 pallets, weight TBC. Loading on October 1, 2026.
+  card:
+    shipper_name: null
+    cargo_category: null
+    equipment_type: tent
+    pieces: 14
+    weight_total: null
+    weight_per_piece: null
+    origin: {city: Тула, region: Тульская область}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-10-01
+    delivery_date: null
+    special_conditions: []
+
+# --- 33. «Низкорамник», габариты формой Д×Ш×В, цепи и коврики
+- author: agent
+  provenance: mock
+  language: ru
+  request_date: 2026-09-25
+  text: |
+    Требуется низкорамник под автокран (1 единица), 28 т. Волгоград — Ростов-на-Дону, погрузка 05.10.2026.
+    Габариты Д×Ш×В: 10 × 3 × 3,8 м. Крепление: цепи и антискользящие коврики.
+  card:
+    shipper_name: null
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 28, unit: t}
+    weight_per_piece: null
+    origin: {city: Волгоград, region: Волгоградская область}
+    destination: {city: Ростов-на-Дону, region: Ростовская область}
+    pickup_date: 2026-10-05
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [chains, anti_slip_mats]}
+      - kind: oversize
+        length: {value: 10, unit: m}
+        width: {value: 3, unit: m}
+        height: {value: 3.8, unit: m}

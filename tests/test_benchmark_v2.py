@@ -160,6 +160,31 @@ def test_manual_v2_cases_are_canonical(tmp_path: Path) -> None:
         load_manual_cases(path, "card_v2")
 
 
+def test_mock_cases_are_not_counted_as_real(tmp_path: Path) -> None:
+    cases = yaml.safe_load(EXAMPLE.read_text(encoding="utf-8"))[:2]
+    cases[1]["provenance"] = "mock"
+    path = tmp_path / "cases.yaml"
+    path.write_text(yaml.safe_dump(cases, allow_unicode=True), encoding="utf-8")
+    real, mock = load_manual_cases(path, "card_v2")[0]
+    assert (real.id, real.template_family, real.synthetic) == ("manual-example-1", "manual", False)
+    assert (mock.id, mock.group_id, mock.template_family, mock.synthetic) == (
+        "mock-example-2", "mock:example:2", "manual_mock", True)  # fmt: skip
+    assert check_record(mock) == []
+    cases[0]["provenance"] = "invented"
+    path.write_text(yaml.safe_dump(cases, allow_unicode=True), encoding="utf-8")
+    with pytest.raises(DataValidationError):
+        load_manual_cases(path, "card_v2")
+
+
+def test_committed_mocks_are_valid_and_marked_synthetic() -> None:
+    """The agent's mock requests (D-103) never pass for real ones."""
+    records, warnings = load_manual_cases(REPO_ROOT / "configs/eval/bench_v2_mock.yaml", "card_v2")
+    assert warnings == [] and len(records) == 33
+    assert all(r.synthetic and r.template_family == "manual_mock" and r.id.startswith("mock-")
+               for r in records)  # fmt: skip
+    assert all(check_record(r) == [] for r in records)
+
+
 @pytest.mark.slow
 @pytest.mark.skipif(
     not (REPO_ROOT / GENERATED / "test.jsonl").exists() or not REAL_RAW.exists(),

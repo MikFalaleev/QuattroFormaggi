@@ -13,6 +13,11 @@ case goes through the same checks as a generated one. Format (a YAML list):
         shipper_name: ООО «Ромашка»
         ...all 11 card fields, null when the text does not say...
       conflicts: []             # optional: [{field: pieces, values: [18, 20]}]
+      provenance: real          # optional: real (default) | mock
+
+A `mock` case is written to look like a real request but is not one (for bench_v2 the agent
+wrote them at the user's request, D-103): its record is `synthetic`, with the family
+`manual_mock` and ids `mock-...`, so reports never count it as a real request.
 
 The card follows the schema of the benchmark (card_v1 or card_v2, sub-step V5). For card_v2 the
 special conditions and their lists may be written in any order: code puts them in the
@@ -25,7 +30,7 @@ import json
 from collections import Counter
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import yaml
 from pydantic import Field, ValidationError
@@ -48,6 +53,12 @@ from qf.domain import (
 
 __all__ = ["ManualCase", "load_manual_cases"]
 
+Provenance = Literal["real", "mock"]
+_PROVENANCE: Final[dict[Provenance, tuple[str, str, bool]]] = {
+    "real": ("manual", "manual", False),  # id prefix, template family, synthetic
+    "mock": ("mock", "manual_mock", True),
+}
+
 
 class ManualCase(StrictConfig):
     author: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
@@ -56,6 +67,7 @@ class ManualCase(StrictConfig):
     text: str = Field(min_length=1)
     card: dict[str, Any]
     conflicts: list[dict[str, Any]] = Field(default_factory=list)
+    provenance: Provenance = "real"
 
 
 def _place_warnings(card: Any, case_id: str) -> tuple[list[Issue], list[str]]:
@@ -77,7 +89,8 @@ def _place_warnings(card: Any, case_id: str) -> tuple[list[Issue], list[str]]:
 def _record(
     case: ManualCase, n: int, schema_version: TargetSchemaVersion
 ) -> tuple[SFTRecord, list[Issue], list[str]]:
-    case_id = f"manual-{case.author}-{n}"
+    prefix, family, synthetic = _PROVENANCE[case.provenance]
+    case_id = f"{prefix}-{case.author}-{n}"
     schema = get_target_schema(schema_version)
     # Through JSON: a date written as 2026-09-22 or '2026-09-22' is an ISO string there, while
     # "18" stays a string and is refused as a number (strict contracts, D-041).
@@ -95,9 +108,9 @@ def _record(
         mode = "per_piece"
     task = SHIPMENT_EXTRACTION
     record = SFTRecord(
-        id=case_id, task=task.name, group_id=f"manual:{case.author}:{n}",
-        source_id=f"manual:{case.author}:{n}", language=case.language, reviewed=True,
-        synthetic=False, template_family="manual",
+        id=case_id, task=task.name, group_id=f"{prefix}:{case.author}:{n}",
+        source_id=f"{prefix}:{case.author}:{n}", language=case.language, reviewed=True,
+        synthetic=synthetic, template_family=family,
         variant=VariantInfo(weight_unit=weight.unit if weight else None, weight_mode=mode,
                             dropped_fields=[], hard_cases=[], request_date=case.request_date,
                             date_style="text", city_lang=case.language, ood_reason=None),
