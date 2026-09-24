@@ -3,6 +3,8 @@
 /data/
 /artifacts/
 /runs/
+# Research journal, experiment log and article drafts: local only, by the user's decision (D-108)
+/research/
 *.gguf
 *.safetensors
 *.bin
