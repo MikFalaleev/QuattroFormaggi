@@ -13,16 +13,29 @@ from pydantic import Field
 
 from qf.contracts._model import ContractModel
 from qf.contracts.card_v1 import ExtractionTarget, FieldName, WeightUnit
-from qf.contracts.records import HardCaseName, Language, OodReason, VariantInfo
+from qf.contracts.card_v2 import ConditionKind, LengthUnit
+from qf.contracts.card_v2 import ExtractionTarget as ExtractionTargetV2
+from qf.contracts.card_v2 import FieldName as FieldNameV2
+from qf.contracts.records import (
+    HardCaseName,
+    Language,
+    OodReason,
+    TargetSchemaVersion,
+    VariantInfo,
+)
 
-__all__ = ["RenderedField", "RenderedRequest", "RequestDraft"]
+__all__ = ["AnyFieldName", "Dimension", "RenderedField", "RenderedRequest", "RequestDraft"]
+
+AnyFieldName = FieldName | FieldNameV2
+"""A card field of card_v1 or card_v2 (the generator renders both, D-094)."""
+Dimension = Literal["length", "width", "height"]
 
 
 class RenderedField(ContractModel):
     """One mention of a card field in the text: the exact substring and the value it denotes."""
 
     text: str = Field(min_length=1)
-    field: FieldName
+    field: AnyFieldName
     gold_value: Any
 
 
@@ -32,6 +45,12 @@ class RequestDraft(ContractModel):
     `conflicts` maps a field to the second, different source value written in the text
     (weight_total: pounds; pieces: count). `distractors` holds numbers that are not card fields
     (rate in rubles, dock, request number) and must never reach the card.
+
+    The fields after `ood_reason` are card_v2 only (sub-step V3, D-094); their defaults keep
+    card_v1 drafts as they were. `conditions_dropped` are left out of the text,
+    `conditions_without_values` are named without their values, `oversize_dims` lists the
+    dimensions written (None: all the facts have) and `conditions_scattered` spreads the
+    conditions over the text instead of one group.
     """
 
     language: Language
@@ -45,12 +64,18 @@ class RequestDraft(ContractModel):
     distractors: dict[str, int]
     hard_cases: list[HardCaseName]
     ood_reason: OodReason | None
+    schema_version: TargetSchemaVersion = "card_v1"
+    length_unit: LengthUnit = "m"
+    conditions_dropped: list[ConditionKind] = Field(default_factory=list)
+    conditions_without_values: list[ConditionKind] = Field(default_factory=list)
+    oversize_dims: list[Dimension] | None = None
+    conditions_scattered: bool = False
 
 
 class RenderedRequest(ContractModel):
     """Request text with the evidence for every field and the gold answer built from it."""
 
     text: str = Field(min_length=1)
-    evidence: dict[FieldName, list[str]]
-    target: ExtractionTarget
+    evidence: dict[AnyFieldName, list[str]]
+    target: ExtractionTarget | ExtractionTargetV2
     variant: VariantInfo

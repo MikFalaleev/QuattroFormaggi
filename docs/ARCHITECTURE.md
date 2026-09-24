@@ -301,6 +301,10 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `relative_date` | `qf.data.render.hard_cases:RelativeDate` | 6 | нет |
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `distractor_numbers` | `qf.data.render.hard_cases:DistractorNumbers` | 6 | нет |
 | `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `city_lang_switch` | `qf.data.render.hard_cases:CityLangSwitch` | 6 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `condition_no_values` (условие названо без значений; только `card_v2`) | `qf.data.render.hard_cases:ConditionNoValues` | V3 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `required_condition_dropped` (нет обязательного условия транспорта; только `card_v2`) | `qf.data.render.hard_cases:RequiredConditionDropped` | V3 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `oversize_partial` (у трала не все габариты; только `card_v2`) | `qf.data.render.hard_cases:OversizePartial` | V3 | нет |
+| `HardCase` | `HARD_CASES` (`qf.data`, kind `hard_case`) | `conditions_scattered` (условия вразброс по тексту; только `card_v2`) | `qf.data.render.hard_cases:ConditionsScattered` | V3 | нет |
 | `Splitter` | `SPLITTERS` (`qf.data`, kind `splitter`) | `group_hash` | `qf.data.split:GroupHashSplitter` | 7 | нет |
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (схема ответа → промпт: `card_v1` → `system_extract_v1`, `card_v2` → `system_extract_v2`, D-086) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 | — (реестр без порта: записи — `TargetSchema`) | `TARGET_SCHEMAS` (`qf.domain`, kind `target_schema`) | `card_v1`, `card_v2` (разбор, запись, правило недостающих полей, согласованность, JSON-схема) | `qf.domain.schemas` | V1 (D-086) | нет |
@@ -368,4 +372,9 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Назначение транспорта и условий — этап `qf.data` по версионируемой таблице (как замена городов, D-047), а не порт с реестром: реализация одна, а замена — это новая версия таблицы. Этап выводит `load_facts_v2` из `load_facts_v1` и не трогает порт `FactsBuilder` шага 5 (D-092).
 - Артефакт одного вида (`load_facts`) теперь существует в двух версиях. Читатель, которому нужна конкретная версия, передаёт в `read_artifact` ровно её (`{LOAD_FACTS_SCHEMA_VERSION}`), а не все поддерживаемые версии вида.
+
+## Реализация подшага V3: отличия от текста Части C
+
+- Генератор общий для `card_v1` и `card_v2`: типы генератора (`RenderedField`, `RenderedRequest`, `RequestDraft`) и порты `TemplateFamily`/`HardCase` принимают данные обеих версий (`AnyFieldName`, `AnyLoadFacts`), а всё, что зависит от схемы — слова, фрагменты условий, сборщик эталона, факты, — выбирается словарём по версии схемы (`VOCABULARIES`, `ASSEMBLERS`, `FACTS_FOR_SCHEMA`), без ветвлений по версии (D-094).
+- `generate_rendered` возвращает записи вместе с черновиками (нужны инвариантам на реальных данных); `generate_records` — обёртка над ним.
 

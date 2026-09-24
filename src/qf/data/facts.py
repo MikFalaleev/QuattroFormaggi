@@ -14,7 +14,7 @@ from types import MappingProxyType
 from typing import Any, Final
 
 import pandas as pd
-from pydantic import ValidationError, field_validator
+from pydantic import BaseModel, ValidationError, field_validator
 
 from qf.common import (
     ArtifactRef,
@@ -200,13 +200,14 @@ def save_facts(
     )
 
 
-def load_facts(ref: ArtifactRef, root: Path) -> list[LoadFacts]:
-    """Records of a `load_facts` artifact already verified by `read_artifact`."""
+def load_facts(ref: ArtifactRef, root: Path, *, model: type[BaseModel] = LoadFacts) -> list[Any]:
+    """Records of a `load_facts` artifact already verified by `read_artifact`, parsed with
+    `model` (`LoadFacts`, or `LoadFactsV2` for `load_facts_v2`)."""
     path = root / ref.path
     facts = []
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         try:
-            facts.append(LoadFacts.model_validate_json(line))
+            facts.append(model.model_validate_json(line))
         except ValidationError as exc:
             issue = Issue(f"{ref.path}:{number}", None, "SCHEMA", format_validation_error(exc))
             raise DataValidationError([issue]) from exc

@@ -2,6 +2,8 @@
 
 Each case returns a new, validated draft and records its name in `hard_cases`. A case that
 cannot be applied to a load raises `HardCaseNotApplicable`; the generator then picks another.
+The last four cases (sub-step V3, D-095) concern the special conditions of card_v2 and apply
+only to `load_facts_v2`.
 """
 
 from __future__ import annotations
@@ -11,22 +13,35 @@ from datetime import timedelta
 from random import Random
 from typing import Any, Final
 
-from qf.contracts import FieldName, LoadFacts, Quantity, RequestDraft
+from qf.contracts import (
+    AnyLoadFacts,
+    Dimension,
+    FieldName,
+    LoadFactsV2,
+    OversizeCondition,
+    Quantity,
+    RequestDraft,
+    TemperatureCondition,
+)
 from qf.data.registries import HARD_CASES
 from qf.data.render.base import HardCaseNotApplicable
-from qf.domain import render_value_from_lbs, render_value_per_piece, to_kg
+from qf.domain import REQUIRED_CONDITIONS, render_value_from_lbs, render_value_per_piece, to_kg
 
 __all__ = [
     "DROPPABLE_FIELDS",
     "MAX_ATTEMPTS",
     "MIN_WEIGHT_DIFFERENCE_KG",
     "CityLangSwitch",
+    "ConditionNoValues",
+    "ConditionsScattered",
     "ConflictPieces",
     "ConflictWeight",
     "DistractorNumbers",
     "DroppedFields",
+    "OversizePartial",
     "PerPieceWeight",
     "RelativeDate",
+    "RequiredConditionDropped",
 ]
 
 DROPPABLE_FIELDS: Final[tuple[FieldName, ...]] = (
@@ -51,7 +66,7 @@ def _with(draft: RequestDraft, name: str, **changes: Any) -> RequestDraft:
 class _HardCase:
     name: str
 
-    def applicable(self, facts: LoadFacts) -> bool:
+    def applicable(self, facts: AnyLoadFacts) -> bool:
         return True
 
 
@@ -61,7 +76,7 @@ class DroppedFields(_HardCase):
 
     name = "dropped_fields"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         chosen = set(rng.sample(DROPPABLE_FIELDS, rng.randint(1, 3)))
         dropped = [name for name in DROPPABLE_FIELDS if name in chosen]
         return _with(draft, self.name, dropped_fields=dropped)
@@ -73,7 +88,7 @@ class PerPieceWeight(_HardCase):
 
     name = "per_piece_weight"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         unit = draft.weight_unit
         try:
             render_value_per_piece(facts.weight_lbs, facts.pieces, unit)
@@ -88,7 +103,7 @@ class ConflictWeight(_HardCase):
 
     name = "conflict_weight"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         unit = draft.weight_unit
         first = render_value_from_lbs(facts.weight_lbs, unit)
         for _ in range(MAX_ATTEMPTS):
@@ -109,7 +124,7 @@ class ConflictPieces(_HardCase):
 
     name = "conflict_pieces"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         shift = rng.randint(1, 3)
         other = facts.pieces + rng.choice((-1, 1)) * shift
         if other < 1:  # a downward shift below one piece becomes an upward one
@@ -123,7 +138,7 @@ class RelativeDate(_HardCase):
 
     name = "relative_date"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         request_date = facts.pickup_date - timedelta(days=rng.randint(0, 2))
         return _with(draft, self.name, request_date=request_date, date_style="relative")
 
@@ -135,7 +150,7 @@ class DistractorNumbers(_HardCase):
 
     name = "distractor_numbers"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         taken = {facts.pieces, *_weight_numbers(facts, draft)}
         numbers: dict[str, int] = {}
         for key, low, high, step in _DISTRACTOR_RANGES:
@@ -150,11 +165,27 @@ class DistractorNumbers(_HardCase):
         return _with(draft, self.name, distractors=numbers)
 
 
-def _weight_numbers(facts: LoadFacts, draft: RequestDraft) -> set[int | float]:
+def _weight_numbers(facts: AnyLoadFacts, draft: RequestDraft) -> set[int | float]:
     values: set[int | float] = {render_value_from_lbs(facts.weight_lbs, draft.weight_unit)}
     with contextlib.suppress(ValueError):  # a piece may round to 0 t
         values.add(render_value_per_piece(facts.weight_lbs, facts.pieces, draft.weight_unit))
-    return values
+    return values | _condition_numbers(facts)
+
+
+def _condition_numbers(facts: AnyLoadFacts) -> set[int | float]:
+    """Numbers a card_v2 condition may put into the text: temperatures (with and without the
+    sign) and dimensions in metres and centimetres. Empty for card_v1 facts."""
+    if not isinstance(facts, LoadFactsV2):
+        return set()
+    numbers: set[int | float] = set()
+    for condition in facts.special_conditions:
+        if isinstance(condition, TemperatureCondition):
+            numbers |= {abs(v) for v in (condition.min_c, condition.max_c) if v is not None}
+        elif isinstance(condition, OversizeCondition):
+            for length in (condition.length, condition.width, condition.height):
+                if length is not None:
+                    numbers |= {length.value, round(float(length.value) * 100)}
+    return numbers
 
 
 @HARD_CASES.register("city_lang_switch")
@@ -164,5 +195,78 @@ class CityLangSwitch(_HardCase):
 
     name = "city_lang_switch"
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         return _with(draft, self.name, city_lang="en" if draft.language == "ru" else "ru")
+
+
+# --- card_v2 conditions (sub-step V3) ------------------------------------------------------
+
+
+def _conditions(facts: AnyLoadFacts) -> list[str]:
+    return [c.kind for c in facts.special_conditions] if isinstance(facts, LoadFactsV2) else []
+
+
+@HARD_CASES.register("condition_no_values")
+class ConditionNoValues(_HardCase):
+    """One condition is named without its values («нужен температурный режим»): it stays in
+    the card with empty values and goes to missing_fields."""
+
+    name = "condition_no_values"
+
+    def applicable(self, facts: AnyLoadFacts) -> bool:
+        return bool(_conditions(facts))
+
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
+        kind = rng.choice(_conditions(facts))
+        return _with(draft, self.name, conditions_without_values=[kind])
+
+
+@HARD_CASES.register("required_condition_dropped")
+class RequiredConditionDropped(_HardCase):
+    """The condition the equipment needs is not in the text (a reefer without a temperature, a
+    lowbed trailer without dimensions): it is absent from the card and missing."""
+
+    name = "required_condition_dropped"
+
+    def _required(self, facts: AnyLoadFacts) -> list[str]:
+        if not isinstance(facts, LoadFactsV2):
+            return []
+        needed = REQUIRED_CONDITIONS.get(facts.equipment_type, ())
+        return [kind for kind in _conditions(facts) if kind in needed]
+
+    def applicable(self, facts: AnyLoadFacts) -> bool:
+        return bool(self._required(facts))
+
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
+        return _with(draft, self.name, conditions_dropped=self._required(facts))
+
+
+@HARD_CASES.register("oversize_partial")
+class OversizePartial(_HardCase):
+    """A lowbed load with one or two of its three dimensions in the text: the card keeps
+    them and the oversize condition goes to missing_fields."""
+
+    name = "oversize_partial"
+    _DIMENSIONS: Final[tuple[Dimension, ...]] = ("length", "width", "height")
+
+    def applicable(self, facts: AnyLoadFacts) -> bool:
+        return (isinstance(facts, LoadFactsV2) and facts.equipment_type == "lowbed"
+                and "oversize" in _conditions(facts))  # fmt: skip
+
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
+        kept = set(rng.sample(self._DIMENSIONS, rng.randint(1, 2)))
+        dims = [name for name in self._DIMENSIONS if name in kept]
+        return _with(draft, self.name, oversize_dims=dims)
+
+
+@HARD_CASES.register("conditions_scattered")
+class ConditionsScattered(_HardCase):
+    """Two or more conditions spread over the text instead of one group."""
+
+    name = "conditions_scattered"
+
+    def applicable(self, facts: AnyLoadFacts) -> bool:
+        return len(_conditions(facts)) >= 2
+
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
+        return _with(draft, self.name, conditions_scattered=True)

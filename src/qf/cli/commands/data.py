@@ -238,14 +238,37 @@ def configure_build(parser: argparse.ArgumentParser) -> None:
     _add_source_config(parser, "--source-config")
 
 
+def _facts_v1(root: Path, facts_v1: Path) -> Path:
+    return facts_v1
+
+
+def _facts_v2(root: Path, facts_v1: Path) -> Path:
+    """Sub-step V2 with the default table: the facts card_v2 is generated from."""
+    result = build_facts_v2_artifact(
+        facts_v1, root / DEFAULT_CONDITIONS_TABLE, root=root,
+        out_path=root / DATA_PROCESSED / LOAD_FACTS_V2_FILENAME,
+        report_path=root / DATA_PROCESSED / FACTS_V2_REPORT_FILENAME,
+    )  # fmt: skip
+    print(f"Built {result.count} load facts v2: {result.ref.path} "
+          f"(sha256 {result.ref.sha256[:12]})")  # fmt: skip
+    return root / result.ref.path
+
+
+_FACTS_FOR_SCHEMA = {"card_v1": _facts_v1, "card_v2": _facts_v2}
+"""The facts the generator of each answer schema reads (card_v2: derived from card_v1 facts)."""
+
+
 def run_build(args: argparse.Namespace) -> int:
-    """Facts (step 5), then the SFT records generated from them (step 6)."""
+    """Facts (step 5; for card_v2 also sub-step V2), then the SFT records generated from them
+    (step 6; card_v2: sub-step V3)."""
     root = project_root()
-    facts_path = _build_facts(root, args.facts_config, args.source_config)
-    source, _ = _load_source(root, args.source_config)
-    provenance = read_provenance(raw_dataset_path(source, root))
     config_path = args.config or root / DEFAULT_GENERATE_CONFIG
     cfg = load_yaml_config(config_path, GenerateConfig)
+    facts_path = _FACTS_FOR_SCHEMA[cfg.schema_version](
+        root, _build_facts(root, args.facts_config, args.source_config)
+    )
+    source, _ = _load_source(root, args.source_config)
+    provenance = read_provenance(raw_dataset_path(source, root))
     result = generate_dataset(
         facts_path,
         cfg,

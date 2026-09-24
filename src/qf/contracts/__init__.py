@@ -41,7 +41,7 @@ from qf.contracts.card_v2 import MissingField as MissingFieldV2
 from qf.contracts.card_v2 import ShipmentCard as ShipmentCardV2
 from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
-from qf.contracts.facts_v2 import LOAD_FACTS_V2_SCHEMA_VERSION, LoadFactsV2
+from qf.contracts.facts_v2 import LOAD_FACTS_V2_SCHEMA_VERSION, AnyLoadFacts, LoadFactsV2
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
 from qf.contracts.ports import (
     FactsBuilder,
@@ -64,7 +64,13 @@ from qf.contracts.records import (
     TaskName,
     VariantInfo,
 )
-from qf.contracts.rendering import RenderedField, RenderedRequest, RequestDraft
+from qf.contracts.rendering import (
+    AnyFieldName,
+    Dimension,
+    RenderedField,
+    RenderedRequest,
+    RequestDraft,
+)
 from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, supported_versions
 
 __all__ = [
@@ -118,6 +124,9 @@ __all__ = [
     "Language",
     "LoadFacts",
     "LoadFactsV2",
+    "AnyLoadFacts",
+    "AnyFieldName",
+    "Dimension",
     "Message",
     "Place",
     "Quantity",

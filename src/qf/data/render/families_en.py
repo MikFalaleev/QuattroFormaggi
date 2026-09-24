@@ -97,6 +97,7 @@ class KeyValueEn(LayoutFamily):
     language = "en"
     joiner = "\n"
     preposition = False
+    condition_style = "list"
     slots = {
         "header": ("Transport request", "Shipment details:", "Quote request"),
         "origin": ("Origin: {origin}", "From: {origin}", "Pickup location: {origin}"),

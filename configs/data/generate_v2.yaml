@@ -1,0 +1,40 @@
+# Sub-step V3: the card_v2 generator (docs/PLAN_card_v2.md, D-094, D-095).
+# Output: data/processed/generated_v2/. Facts: load_facts_v2 (qf data facts-v2, table
+# configs/data/equipment_conditions_v1.yaml); `qf data build --config` builds them first.
+dataset_name: generated_v2
+seed: 42
+task: shipment_extraction
+schema_version: card_v2
+system_prompt_version: system_extract_v2
+language_share: {ru: 0.6, en: 0.4}
+variants_per_load: 1
+pool:                                  # loads per split (stratified sampling)
+  train: 1500
+  val: 150
+  test: 600                            # larger than v1: bench_v2 takes its hard slices from here
+  test_ood: 300                        # three parts: ood_reason route / family / both
+  smoke: 50
+mix:                                   # share of records by kind inside every split
+  clean: 0.40
+  dropped_fields: 0.20
+  hard: 0.15                           # one case drawn uniformly from `hard`
+  conditions: 0.25                     # one case of `condition_hard`, weighted among those that apply
+hard: [per_piece_weight, conflict_weight, conflict_pieces, relative_date, distractor_numbers, city_lang_switch]
+condition_hard:                        # weights; a load without conditions stays clean
+  condition_no_values: 1
+  required_condition_dropped: 3
+  oversize_partial: 6
+  conditions_scattered: 1
+weight_unit_share: {kg: 0.6, t: 0.4}
+length_unit_share: {m: 0.7, cm: 0.3}   # dimensions in the text
+families: [T1, T2, T3, T4, T5, T6, T7, T8]
+ood:
+  holdout_route_count: 6
+  holdout_families: [T7, T8]
+stratify_by: [profile, load_month, route_id]
+profile_floor: 0.015                   # every table profile gets at least 1.5% of each sample
+review_samples: 40                     # curated samples for the V3 review -> review_samples.md
+hard_case_floor:                       # at least this many records per split (bench_v2 needs ~10)
+  train: {oversize_partial: 15, conditions_scattered: 30}   # lowbed: keep most train cards complete
+  test: {condition_no_values: 8, required_condition_dropped: 8, oversize_partial: 8, conditions_scattered: 8}
+  test_ood: {condition_no_values: 4, required_condition_dropped: 4, oversize_partial: 4, conditions_scattered: 4}

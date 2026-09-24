@@ -66,6 +66,8 @@ from qf.data.fetch import (
     write_provenance,
 )
 from qf.data.generate import (
+    FACTS_FOR_SCHEMA,
+    REVIEW_SAMPLES_FILENAME,
     GenerateConfig,
     GeneratedRecord,
     GenerateResult,
@@ -73,6 +75,7 @@ from qf.data.generate import (
     generate_dataset,
     generate_record,
     generate_records,
+    generate_rendered,
     render_record,
     sample_loads,
 )
@@ -107,6 +110,7 @@ from qf.data.report import (
     length_report,
     length_stats,
 )
+from qf.data.review import curate, render_review
 from qf.data.sft_io import DATASET_FILES, SPLIT_FILES, read_sft_records, write_sft_records
 from qf.data.split import (
     GroupHashSplitter,
@@ -128,6 +132,10 @@ from qf.data.validate import (
 )
 
 __all__ = [
+    "FACTS_FOR_SCHEMA",
+    "REVIEW_SAMPLES_FILENAME",
+    "curate",
+    "render_review",
     "CONDITIONS_REPORT_VERSION",
     "FACTS_V2_REPORT_FILENAME",
     "LABELS_RU",
@@ -187,6 +195,7 @@ __all__ = [
     "GeneratedRecord",
     "sample_loads",
     "generate_records",
+    "generate_rendered",
     "generate_record",
     "generate_dataset",
     "TEMPLATE_FAMILIES",

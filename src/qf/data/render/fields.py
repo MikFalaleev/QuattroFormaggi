@@ -13,9 +13,10 @@ from random import Random
 from typing import Any
 
 from qf.contracts import (
+    AnyFieldName,
+    AnyLoadFacts,
     FieldName,
     Language,
-    LoadFacts,
     Place,
     Quantity,
     RenderedField,
@@ -23,18 +24,20 @@ from qf.contracts import (
     WeightUnit,
 )
 from qf.data.render.vocabulary import (
-    CATEGORY_WORDS,
+    EN_MACHINERY_PIECE_NOUNS,
     EN_MONTHS,
     EN_MONTHS_SHORT,
     EN_PIECE_NOUNS,
     EN_TONNE_WORDS,
-    EQUIPMENT_WORDS,
-    EQUIPMENT_WORDS_SLANG,
     RELATIVE_DAYS,
+    RU_MACHINERY_PIECE_NOUNS,
+    RU_MACHINERY_PIECE_SLANG,
     RU_MONTHS_GENITIVE,
     RU_PIECE_NOUNS,
     RU_PIECE_SLANG,
     RU_TONNE,
+    VOCABULARIES,
+    CardVocabulary,
     ru_plural,
 )
 from qf.domain import CITIES, render_value_from_lbs, render_value_per_piece
@@ -60,7 +63,7 @@ class Fragment:
     covers: frozenset[str] = field(default_factory=frozenset)
 
 
-def _field(text: str, name: FieldName, gold: Any) -> RenderedField:
+def _field(text: str, name: AnyFieldName, gold: Any) -> RenderedField:
     return RenderedField(text=text, field=name, gold_value=gold)
 
 
@@ -115,20 +118,30 @@ def render_weight(
     return weight_text(value, unit, lang, rng, compact=compact), Quantity(value=value, unit=unit)
 
 
-def render_pieces(n: int, lang: Language, rng: Random, *, compact: bool = False) -> str:
-    """«22 паллеты», «1 место», «18 палл.» (compact), «22 pallets»."""
+def render_pieces(
+    n: int, lang: Language, rng: Random, *, compact: bool = False, machinery: bool = False
+) -> str:
+    """«22 паллеты», «1 место», «18 палл.» (compact), «22 pallets»; machinery (card_v2) counts
+    units: «2 единицы техники», «1 ед.», «2 units»."""
     if lang == "en":
-        singular, plural = rng.choice(EN_PIECE_NOUNS)
+        singular, plural = rng.choice(EN_MACHINERY_PIECE_NOUNS if machinery else EN_PIECE_NOUNS)
         return f"{n} {singular if n == 1 else plural}"
+    slang, nouns = ((RU_MACHINERY_PIECE_SLANG, RU_MACHINERY_PIECE_NOUNS) if machinery
+                    else (RU_PIECE_SLANG, RU_PIECE_NOUNS))  # fmt: skip
     if compact and rng.random() < 0.6:
-        return f"{n} {rng.choice(RU_PIECE_SLANG)}"
-    return f"{n} {ru_plural(n, rng.choice(RU_PIECE_NOUNS))}"
+        return f"{n} {rng.choice(slang)}"
+    return f"{n} {ru_plural(n, rng.choice(nouns))}"
 
 
-def _per_piece(facts: LoadFacts, draft: RequestDraft, rng: Random, compact: bool) -> Fragment:
+def _machinery(facts: AnyLoadFacts) -> bool:
+    return facts.cargo_category == "machinery"  # card_v2 only; never true for card_v1 facts
+
+
+def _per_piece(facts: AnyLoadFacts, draft: RequestDraft, rng: Random, compact: bool) -> Fragment:
     unit = draft.weight_unit
     value = render_value_per_piece(facts.weight_lbs, facts.pieces, unit)
-    pieces = render_pieces(facts.pieces, draft.language, rng, compact=compact)
+    pieces = render_pieces(facts.pieces, draft.language, rng, compact=compact,
+                           machinery=_machinery(facts))  # fmt: skip
     weight = weight_text(value, unit, draft.language, rng, compact=compact)
     if draft.language == "ru":
         text = f"{pieces} по {weight}"
@@ -229,7 +242,9 @@ def _place_fragments(
 # --- notes: conflicts and distractors -------------------------------------------------------
 
 
-def _weight_conflict(facts: LoadFacts, draft: RequestDraft, rng: Random, compact: bool) -> Fragment:
+def _weight_conflict(
+    facts: AnyLoadFacts, draft: RequestDraft, rng: Random, compact: bool
+) -> Fragment:
     value = render_value_from_lbs(draft.conflicts["weight_total"], draft.weight_unit)
     text = weight_text(value, draft.weight_unit, draft.language, rng, compact=compact)
     frames = {
@@ -246,9 +261,11 @@ def _weight_conflict(facts: LoadFacts, draft: RequestDraft, rng: Random, compact
     )
 
 
-def _pieces_conflict(facts: LoadFacts, draft: RequestDraft, rng: Random, compact: bool) -> Fragment:
+def _pieces_conflict(
+    facts: AnyLoadFacts, draft: RequestDraft, rng: Random, compact: bool
+) -> Fragment:
     count = draft.conflicts["pieces"]
-    text = render_pieces(count, draft.language, rng, compact=compact)
+    text = render_pieces(count, draft.language, rng, compact=compact, machinery=_machinery(facts))
     frames = {
         "ru": ("В накладной при этом {v}.", "По данным склада — {v}.",
                "В спецификации указано {v}."),
@@ -282,7 +299,13 @@ def _distractors(draft: RequestDraft, rng: Random) -> Fragment:
 
 
 def build_fragments(
-    facts: LoadFacts, draft: RequestDraft, rng: Random, *, compact: bool, preposition: bool
+    facts: AnyLoadFacts,
+    draft: RequestDraft,
+    rng: Random,
+    *,
+    compact: bool,
+    preposition: bool,
+    vocabulary: CardVocabulary = VOCABULARIES["card_v1"],
 ) -> dict[str, Fragment]:
     """Placeholder name -> fragment for every field the draft puts into the text.
 
@@ -297,19 +320,20 @@ def build_fragments(
             facts.shipper_name, facts.shipper_name, "shipper_name", facts.shipper_name
         )
     if "cargo_category" not in dropped:
-        word = rng.choice(CATEGORY_WORDS[lang][facts.cargo_category])
+        word = rng.choice(vocabulary.category[lang][facts.cargo_category])
         fragments["category"] = _mention(word, word, "cargo_category", facts.cargo_category)
     if "equipment_type" not in dropped:
-        words = EQUIPMENT_WORDS[lang][facts.equipment_type]
+        words = vocabulary.equipment[lang][facts.equipment_type]
         if compact and lang == "ru":
-            words = EQUIPMENT_WORDS_SLANG[facts.equipment_type]
+            words = vocabulary.equipment_slang[facts.equipment_type]
         word = rng.choice(words)
         fragments["equipment"] = _mention(word, word, "equipment_type", facts.equipment_type)
     if draft.weight_mode == "per_piece":
         fragments["per_piece"] = _per_piece(facts, draft, rng, compact)
     else:
         if "pieces" not in dropped:
-            text = render_pieces(facts.pieces, lang, rng, compact=compact)
+            text = render_pieces(facts.pieces, lang, rng, compact=compact,
+                                 machinery=_machinery(facts))  # fmt: skip
             fragments["pieces"] = _mention(text, text, "pieces", facts.pieces)
         if "weight_total" not in dropped:
             text, gold = render_weight(facts.weight_lbs, lang, draft.weight_unit, rng,

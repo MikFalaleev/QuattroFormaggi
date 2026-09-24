@@ -10,35 +10,46 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from random import Random
-from typing import Any
+from typing import Any, Final
 
 from pydantic import BaseModel
 
 from qf.common import QFError
 from qf.contracts import (
+    CARD_V2_CONDITION_KINDS,
+    AnyFieldName,
+    AnyLoadFacts,
     Conflict,
+    ConflictV2,
     ExtractionTarget,
-    FieldName,
+    ExtractionTargetV2,
     Language,
     LoadFacts,
+    LoadFactsV2,
     RenderedField,
     RenderedRequest,
     RequestDraft,
     ShipmentCard,
+    ShipmentCardV2,
+    SpecialCondition,
     VariantInfo,
 )
+from qf.data.render.conditions import ConditionStyle, condition_fragments
 from qf.data.render.fields import Fragment, build_fragments
-from qf.domain import compute_missing_fields
+from qf.data.render.vocabulary import VOCABULARIES
+from qf.domain import compute_missing_fields, compute_missing_fields_v2
 
 __all__ = [
+    "ASSEMBLERS",
     "HardCaseNotApplicable",
     "Layout",
     "LayoutFamily",
     "RenderError",
     "Slot",
     "assemble",
+    "assemble_v2",
     "fill_layout",
 ]
 
@@ -127,11 +138,12 @@ def _key(value: Any) -> str:
     return json.dumps(_json(value), sort_keys=True, default=str)
 
 
-def assemble(text: str, evidence: Sequence[RenderedField], draft: RequestDraft) -> RenderedRequest:
-    """Gold answer from the evidence: one value -> the card field; two different values ->
-    null plus a conflict; no evidence -> null. `missing_fields` comes from the rule."""
-    mentions: dict[FieldName, list[str]] = {}
-    values: dict[FieldName, list[Any]] = {}
+def _collect(
+    text: str, evidence: Sequence[RenderedField]
+) -> tuple[dict[AnyFieldName, list[str]], dict[AnyFieldName, list[Any]]]:
+    """Mentions and distinct gold values of every field, in text order."""
+    mentions: dict[AnyFieldName, list[str]] = {}
+    values: dict[AnyFieldName, list[Any]] = {}
     for item in evidence:
         if item.text not in text:
             raise RenderError(f"evidence {item.text!r} for {item.field} is not in the text")
@@ -139,19 +151,12 @@ def assemble(text: str, evidence: Sequence[RenderedField], draft: RequestDraft) 
         known = [_key(value) for value in values.get(item.field, [])]
         if _key(item.gold_value) not in known:
             values.setdefault(item.field, []).append(item.gold_value)
-    card: dict[str, Any] = dict.fromkeys(ShipmentCard.model_fields)
-    conflicts = []
-    for name, found in values.items():
-        if len(found) == 1:
-            card[name] = found[0]
-        else:
-            conflicts.append(Conflict(field=name, values=[_json(v) for v in found]))
-    shipment = ShipmentCard(**card)
-    target = ExtractionTarget(
-        card=shipment, missing_fields=compute_missing_fields(shipment), conflicts=conflicts
-    )
+    return mentions, values
+
+
+def _variant(mentions: Mapping[AnyFieldName, list[str]], draft: RequestDraft) -> VariantInfo:
     weight_in_text = "weight_total" in mentions or "weight_per_piece" in mentions
-    variant = VariantInfo(
+    return VariantInfo(
         weight_unit=draft.weight_unit if weight_in_text else None,
         weight_mode=draft.weight_mode if weight_in_text else "none",
         dropped_fields=draft.dropped_fields,
@@ -161,7 +166,78 @@ def assemble(text: str, evidence: Sequence[RenderedField], draft: RequestDraft) 
         city_lang=draft.city_lang,
         ood_reason=draft.ood_reason,
     )
-    return RenderedRequest(text=text, evidence=mentions, target=target, variant=variant)
+
+
+def assemble(text: str, evidence: Sequence[RenderedField], draft: RequestDraft) -> RenderedRequest:
+    """Gold answer from the evidence: one value -> the card field; two different values ->
+    null plus a conflict; no evidence -> null. `missing_fields` comes from the rule."""
+    mentions, values = _collect(text, evidence)
+    card: dict[str, Any] = dict.fromkeys(ShipmentCard.model_fields)
+    conflicts = []
+    for name, found in values.items():
+        if len(found) == 1:
+            card[name] = found[0]
+        else:
+            conflicts.append(Conflict(field=name, values=[_json(v) for v in found]))  # type: ignore[arg-type]
+    shipment = ShipmentCard(**card)
+    target = ExtractionTarget(
+        card=shipment, missing_fields=compute_missing_fields(shipment), conflicts=conflicts
+    )
+    return RenderedRequest(text=text, evidence=mentions, target=target,
+                           variant=_variant(mentions, draft))  # fmt: skip
+
+
+def assemble_v2(
+    text: str, evidence: Sequence[RenderedField], draft: RequestDraft
+) -> RenderedRequest:
+    """`assemble` for card_v2: the conditions are the gold values of the `special_conditions`
+    evidence, one per kind, in canonical order; no evidence -> no conditions (`[]`)."""
+    mentions, values = _collect(text, evidence)
+    conditions: list[SpecialCondition] = values.pop("special_conditions", [])
+    kinds = [condition.kind for condition in conditions]
+    if len(set(kinds)) != len(kinds):
+        raise RenderError(f"a condition kind is written twice: {kinds}")
+    card: dict[str, Any] = dict.fromkeys(ShipmentCardV2.model_fields)
+    card["special_conditions"] = sorted(
+        conditions, key=lambda c: CARD_V2_CONDITION_KINDS.index(c.kind)
+    )
+    conflicts = []
+    for name, found in values.items():
+        if len(found) == 1:
+            card[name] = found[0]
+        else:
+            conflicts.append(ConflictV2(field=name, values=[_json(v) for v in found]))  # type: ignore[arg-type]
+    shipment = ShipmentCardV2(**card)
+    target = ExtractionTargetV2(
+        card=shipment, missing_fields=compute_missing_fields_v2(shipment), conflicts=conflicts
+    )
+    return RenderedRequest(text=text, evidence=mentions, target=target,
+                           variant=_variant(mentions, draft))  # fmt: skip
+
+
+Assembler = Callable[[str, Sequence[RenderedField], RequestDraft], RenderedRequest]
+ASSEMBLERS: Final[dict[str, Assembler]] = {"card_v1": assemble, "card_v2": assemble_v2}
+"""The gold-answer assembler of each answer schema (D-094)."""
+
+
+def _no_conditions(
+    facts: AnyLoadFacts, draft: RequestDraft, rng: Random, style: ConditionStyle
+) -> dict[str, Fragment]:
+    return {}
+
+
+def _conditions_v2(
+    facts: AnyLoadFacts, draft: RequestDraft, rng: Random, style: ConditionStyle
+) -> dict[str, Fragment]:
+    if not isinstance(facts, LoadFactsV2):
+        raise RenderError(f"a card_v2 draft needs load_facts_v2, got {type(facts).__name__}")
+    return condition_fragments(facts, draft, rng, style)
+
+
+_CONDITION_FRAGMENTS: Final[
+    dict[str, Callable[[AnyLoadFacts, RequestDraft, Random, ConditionStyle], dict[str, Fragment]]]
+] = {"card_v1": _no_conditions, "card_v2": _conditions_v2}
+_FACTS_TYPES: Final[dict[str, type]] = {"card_v1": LoadFacts, "card_v2": LoadFactsV2}
 
 
 class LayoutFamily:
@@ -175,19 +251,49 @@ class LayoutFamily:
     compact: bool = False  # slang: abbreviations, no space before units
     capitalize: bool = True  # sentences start with a capital letter (slang stays lowercase)
     preposition: bool = True  # EN prose: «on March 5, 2022»; key-value forms turn it off
+    condition_style: ConditionStyle = "prose"  # card_v2 conditions: prose, list or slang
+    condition_anchor: str = "equipment"  # conditions follow this slot unless scattered
     slots: Mapping[str, Slot]
     orders: tuple[tuple[str, ...], ...]
 
     def layouts(self) -> tuple[Layout, ...]:
         return tuple(tuple(self.slots[name] for name in order) for order in self.orders)
 
-    def render(self, facts: LoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest:
+    def _layout(self, order: Sequence[str], conditions: Sequence[str], draft: RequestDraft,
+                rng: Random) -> Layout:  # fmt: skip
+        """The order's slots with one slot per condition fragment: all after the anchor slot,
+        or (`conditions_scattered`) each after a different, randomly chosen slot. Without
+        conditions (always for card_v1) no random number is drawn."""
+        names: list[str] = list(order)
+        if conditions:
+            placed = list(conditions)
+            if len(placed) > 1:
+                rng.shuffle(placed)
+            if draft.conditions_scattered:
+                spots = rng.sample(range(1, len(names)), min(len(placed), len(names) - 1))
+                for spot, name in sorted(zip(spots, placed, strict=False), reverse=True):
+                    names.insert(spot, name)
+                names += placed[len(spots) :]  # more conditions than places: the rest at the end
+            else:
+                anchor = names.index(self.condition_anchor) + 1
+                names[anchor:anchor] = placed
+        return tuple(self.slots.get(name, (f"{{{name}}}",)) for name in names)
+
+    def render(self, facts: AnyLoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest:
         if draft.language != self.language:
             raise RenderError(f"family {self.name} renders {self.language}, not {draft.language}")
+        if not isinstance(facts, _FACTS_TYPES[draft.schema_version]):
+            raise RenderError(f"a {draft.schema_version} draft cannot render "
+                              f"{type(facts).__name__}")  # fmt: skip
         fragments = build_fragments(
-            facts, draft, rng, compact=self.compact, preposition=self.preposition
-        )
-        layouts = self.layouts()
-        text, evidence = fill_layout(layouts[rng.randrange(len(layouts))], fragments, rng,
-                                     self.joiner, capitalize=self.capitalize)  # fmt: skip
-        return assemble(text, evidence, draft)
+            facts, draft, rng, compact=self.compact, preposition=self.preposition,
+            vocabulary=VOCABULARIES[draft.schema_version],
+        )  # fmt: skip
+        conditions = _CONDITION_FRAGMENTS[draft.schema_version](facts, draft, rng,
+                                                                 self.condition_style)  # fmt: skip
+        fragments |= conditions
+        order = self.orders[rng.randrange(len(self.orders))]
+        layout = self._layout(order, sorted(conditions), draft, rng)
+        text, evidence = fill_layout(layout, fragments, rng, self.joiner,
+                                     capitalize=self.capitalize)  # fmt: skip
+        return ASSEMBLERS[draft.schema_version](text, evidence, draft)

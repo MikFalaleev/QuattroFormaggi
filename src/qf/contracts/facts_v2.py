@@ -17,8 +17,9 @@ from pydantic import Field, field_validator, model_validator
 from qf.contracts._model import ContractModel, NonEmptyStr
 from qf.contracts.card_v1 import Place
 from qf.contracts.card_v2 import CargoCategory, EquipmentType, SpecialCondition
+from qf.contracts.facts import LoadFacts
 
-__all__ = ["LOAD_FACTS_V2_SCHEMA_VERSION", "LoadFactsV2"]
+__all__ = ["LOAD_FACTS_V2_SCHEMA_VERSION", "AnyLoadFacts", "LoadFactsV2"]
 
 LOAD_FACTS_V2_SCHEMA_VERSION: Final = "load_facts_v2"
 
@@ -60,3 +61,7 @@ class LoadFactsV2(ContractModel):
         if self.delivery_date < self.pickup_date:
             raise ValueError(f"delivery {self.delivery_date} is before pickup {self.pickup_date}")
         return self
+
+
+AnyLoadFacts = LoadFacts | LoadFactsV2
+"""Facts of either version: the input of the request generator (card_v1 / card_v2, D-094)."""

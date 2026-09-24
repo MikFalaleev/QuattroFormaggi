@@ -1459,6 +1459,8 @@ CLI:
 
 **V2 реализован** (D-092, D-093): этап `qf data facts-v2`, таблица `configs/data/equipment_conditions_v1.yaml`, факты `load_facts_v2`, отчёт `data/processed/facts_v2_report.md`; ⛔ ждёт проверки таблицы пользователем.
 
+**V3 реализован** (D-094…D-097): генератор `card_v2` (`configs/data/generate_v2.yaml`, `data/processed/generated_v2/`), 4 трудных случая условий, минимумы трудных случаев и нижний порог профилей в выборке, инварианты E16–E17, примеры `review_samples.md`; ⛔ ждёт чтения примеров пользователем.
+
 **Риск для шага 10.** Условия — вложенные объекты; constrained decoding в LM Studio (грамматика llama.cpp) должен их выдержать. Схема держится плоской, проверка — на шаге 10.
 
 ---

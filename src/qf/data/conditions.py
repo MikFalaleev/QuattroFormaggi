@@ -74,6 +74,7 @@ __all__ = [
     "build_facts_v2_artifact",
     "completeness_problems",
     "conditions_report",
+    "describe_conditions",
     "load_conditions_table",
     "render_conditions_report",
 ]
@@ -356,23 +357,33 @@ def conditions_report(facts: Sequence[LoadFactsV2], table: ConditionsTable) -> d
     }  # fmt: skip
 
 
-def _describe_conditions(conditions: Sequence[SpecialCondition]) -> str:
+def describe_conditions(conditions: Sequence[SpecialCondition]) -> str:
+    """«температура +2…+6 °C; датчики: температура» (Russian, for people); a condition named
+    without values reads «упаковка: без значений»."""
     parts = []
     for c in conditions:
         match c:
             case TemperatureCondition():
-                parts.append(f"температура {_temperature(c.min_c, c.max_c)}")
+                values = [] if c.min_c is None and c.max_c is None else [
+                    _temperature(c.min_c, c.max_c)]  # fmt: skip
+                parts.append(_described("температура", values, " "))
             case SecuringCondition():
-                parts.append("крепление: " + ", ".join(LABELS_RU[v] for v in c.methods))
+                parts.append(_described("крепление", [LABELS_RU[v] for v in c.methods]))
             case PackagingCondition():
-                parts.append("упаковка: " + ", ".join(LABELS_RU[v] for v in c.types))
+                parts.append(_described("упаковка", [LABELS_RU[v] for v in c.types]))
             case OversizeCondition():
-                dims = [f"{label} {d.value:g} м" for label, d in (("длина", c.length),
-                        ("ширина", c.width), ("высота", c.height)) if d is not None]  # fmt: skip
-                parts.append("негабарит: " + ", ".join(dims))
+                units = {"m": "м", "cm": "см"}
+                dims = [f"{label} {d.value:g} {units[d.unit]}" for label, d in (
+                        ("длина", c.length), ("ширина", c.width), ("высота", c.height))
+                        if d is not None]  # fmt: skip
+                parts.append(_described("негабарит", dims))
             case SensorsCondition():
-                parts.append("датчики: " + ", ".join(LABELS_RU[v] for v in c.parameters))
+                parts.append(_described("датчики", [LABELS_RU[v] for v in c.parameters]))
     return "; ".join(parts) or "без особых условий"
+
+
+def _described(kind: str, values: Sequence[str], joiner: str = ": ") -> str:
+    return f"{kind}{joiner}{', '.join(values)}" if values else f"{kind}: без значений"
 
 
 def _example(fact: LoadFactsV2) -> dict[str, Any]:
@@ -381,7 +392,7 @@ def _example(fact: LoadFactsV2) -> dict[str, Any]:
         "text": (f"{LABELS_RU[fact.equipment_type]}, {LABELS_RU[fact.cargo_category]}, "
                  f"мест: {fact.pieces}, {fact.weight_lbs * LB_TO_KG / 1000:.1f} т, "
                  f"{fact.origin.city} → {fact.destination.city}; "
-                 f"{_describe_conditions(fact.special_conditions)}"),
+                 f"{describe_conditions(fact.special_conditions)}"),
     }  # fmt: skip
 
 

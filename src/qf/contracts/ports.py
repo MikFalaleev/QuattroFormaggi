@@ -18,6 +18,7 @@ from typing import Protocol, runtime_checkable
 from qf.common import ArtifactRef
 from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LoadFacts
+from qf.contracts.facts_v2 import AnyLoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult
 from qf.contracts.records import Language, SFTRecord
 from qf.contracts.rendering import RenderedRequest, RequestDraft
@@ -81,7 +82,7 @@ class TemplateFamily(Protocol):
     @property
     def ood_only(self) -> bool: ...
 
-    def render(self, facts: LoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest:
+    def render(self, facts: AnyLoadFacts, draft: RequestDraft, rng: Random) -> RenderedRequest:
         """Text of the draft for `facts`, its evidence and the gold answer built from it."""
         ...
 
@@ -93,9 +94,9 @@ class HardCase(Protocol):
     @property
     def name(self) -> str: ...
 
-    def applicable(self, facts: LoadFacts) -> bool: ...
+    def applicable(self, facts: AnyLoadFacts) -> bool: ...
 
-    def apply(self, draft: RequestDraft, facts: LoadFacts, rng: Random) -> RequestDraft:
+    def apply(self, draft: RequestDraft, facts: AnyLoadFacts, rng: Random) -> RequestDraft:
         """A new draft with the difficulty added; the input draft is not changed."""
         ...
 

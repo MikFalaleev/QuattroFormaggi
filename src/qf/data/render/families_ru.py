@@ -101,6 +101,7 @@ class ListRu(LayoutFamily):
     name = "T3"
     language = "ru"
     joiner = "\n"
+    condition_style = "list"
     slots = {
         "header": ("Заявка на перевозку", "Прошу рассчитать перевозку:", "Данные по грузу:"),
         "origin": ("Откуда: {origin}", "Пункт загрузки: {origin}", "Место погрузки: {origin}"),
@@ -141,6 +142,8 @@ class SlangRu(LayoutFamily):
     joiner = "\n"
     compact = True
     capitalize = False
+    condition_style = "slang"
+    condition_anchor = "lead"
     slots = {
         "lead": ("нужен {equipment}", "ищу {equipment}", "{equipment} нужен"),
         "route": ("{origin} → {destination}", "{origin} - {destination}",
