@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qf import __version__
-from qf.cli.commands import bench, data, doctor, ui
+from qf.cli.commands import bench, data, doctor, tokens, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -143,7 +143,20 @@ _SPECS = (
         eval_cmd.run_baseline,
         eval_cmd.configure_baseline,
     ),
-    CommandSpec("tokens audit", "11", "audit tokenizer, chat template and loss mask"),
+    CommandSpec(
+        "tokens fetch",
+        "11",
+        "download the pinned tokenizer and config files (no weights)",
+        tokens.run_fetch,
+        tokens.configure_fetch,
+    ),
+    CommandSpec(
+        "tokens audit",
+        "11",
+        "audit tokenizer, chat template and loss mask",
+        tokens.run_audit,
+        tokens.configure_audit,
+    ),
     CommandSpec("train estimate", "12", "estimate steps, time and cost of training"),
     CommandSpec("train run", "12", "run QLoRA adapter training"),
     CommandSpec("export verify", "15", "verify adapter/merged artifacts against manifests"),

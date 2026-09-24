@@ -1,0 +1,13 @@
+# Step 11: the pinned base model of QF-12B (revision chosen by the user on 2026-09-24, D-113).
+# Only the tokenizer and config files are fetched here, never weights:
+#   uv run qf tokens fetch
+id: mistralai/Mistral-Nemo-Instruct-2407
+revision: 04d8a90549d23fc6bd7f642064003592df51e9b3   # full commit sha (2025-07-28), not a branch
+license: apache-2.0
+tokenizer_files:
+  - tokenizer.json
+  - tokenizer_config.json
+  - special_tokens_map.json
+  - config.json
+  - generation_config.json
+local_dir: artifacts/base_model/mistralai--Mistral-Nemo-Instruct-2407/04d8a90549d23fc6bd7f642064003592df51e9b3

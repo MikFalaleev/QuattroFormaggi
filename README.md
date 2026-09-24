@@ -60,7 +60,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf eval run --config PATH [--resume RUN_DIR]`, `qf eval compare RUN_A RUN_B` | 9, V6 | реализованы для `card_v1` и `card_v2` (backend `fake`; LM Studio — шаг 10); метрики — `docs/EVAL_SPEC.md` |
 | `qf ui [--port 8765]` | — | реализована: локальный веб-интерфейс для ручной проверки — заявки и эталоны, оценка ответа, генератор, отчёты прогонов (D-107) |
 | `qf eval-baseline --config PATH --json-schema on\|off [--resume RUN_DIR]` | 10 | реализована: baseline модели в LM Studio в одном из двух режимов (backend `openai_local`); нижняя граница — `qf eval run` с `configs/eval/baseline_{empty,rules}_v2.yaml` |
-| `qf tokens audit` | 11 | не реализована |
+| `qf tokens fetch [--config PATH]`, `qf tokens audit [--data DIR] [--max-len 2048]` | 11 | реализованы: файлы токенизатора закреплённой ревизии без весов; аудит маски обучения → `runs/<id>/mask_audit.md` (D-113) |
 | `qf train estimate`, `qf train run` | 12 | не реализованы |
 | `qf export verify` | 15 | не реализована |
 | `qf export merge` | 16 | не реализована |
