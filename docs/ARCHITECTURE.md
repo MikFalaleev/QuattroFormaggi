@@ -309,6 +309,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | — (реестр без порта: записи — `TaskSpec`) | `TASKS` (`qf.domain`, kind `task`) | `shipment_extraction` (схема ответа → промпт: `card_v1` → `system_extract_v1`, `card_v2` → `system_extract_v2`, D-086) | `qf.domain.tasks:SHIPMENT_EXTRACTION` | 4 | нет |
 | — (реестр без порта: записи — `TargetSchema`) | `TARGET_SCHEMAS` (`qf.domain`, kind `target_schema`) | `card_v1`, `card_v2` (разбор, запись, правило недостающих полей, согласованность, JSON-схема) | `qf.domain.schemas` | V1 (D-086) | нет |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `fake` (подготовленные ответы по sha256 user-сообщения; не модель) | `qf.backends.fake:FakeBackend` | 9 | нет |
+| `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `openai_local` (LM Studio / llama-server по OpenAI-совместимому API, только адреса этого компьютера) | `qf.backends.openai_local:OpenAILocalBackend` | 10 | нет (лёгкая: httpx) |
+| `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `baseline_empty` (пустая карточка — нижняя граница, не модель), `baseline_rules` (извлекатель на регулярных выражениях — нижняя граница, не модель) | `qf.baselines.backends:EmptyBaseline`, `qf.baselines.backends:RulesBaseline` | 10 (D-109) | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.origin`, `field_accuracy.destination`, `field_accuracy.pickup_date`, `field_accuracy.delivery_date`, `field_accuracy.equipment_type`, `field_accuracy.cargo_category`, `field_accuracy.pieces`, `field_accuracy.weight_total`, `field_accuracy.weight_per_piece`, `field_accuracy.temperature_c`, `field_accuracy.shipper_name` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
@@ -392,3 +394,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Второй слой композиции рядом с CLI: `qf/cli/webui/` (логика `app.py`, HTTP `server.py` на `http.server`, страница `static/index.html`). Как и команды CLI, он импортирует стадии (`qf.data`, `qf.eval`) и домен, а стадии о нём не знают. Своих реестров и портов нет: оценка берётся из `SCORERS`, генерация — из `render_record`.
 - Сервер слушает только адреса этого компьютера и ничего не пишет в проект.
+
+## Реализация шага 10: отличия от текста Части C
+
+- Новый пакет `qf/baselines/` на уровне стадий (D-109): нижние границы «без LLM» реализуют порт `GenerationBackend` и регистрируются в `BACKENDS` из `cli/wiring.py`. Им нужен домен (справочник городов, реестр схем), а `qf.backends` домен импортировать не может, поэтому это отдельный пакет. В import-linter он добавлен в слой стадий, в контракт независимости и в запрет тяжёлых библиотек.
+- `openai_local` не расширяет порт: сведения о модели от сервера (издатель, квантование, контекст) попадают в `model_id`, версия LM Studio — в конфиг backend'а (`runtime`), оборудование — в `hardware` манифеста.

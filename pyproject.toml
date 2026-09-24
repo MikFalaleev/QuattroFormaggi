@@ -105,7 +105,7 @@ type = "layers"
 containers = ["qf"]
 layers = [
     "cli",
-    "data | eval | training | export | runtime | lab",
+    "data | eval | training | export | runtime | lab | baselines",
     "backends | domain",
     "contracts",
     "common",
@@ -114,7 +114,7 @@ layers = [
 [[tool.importlinter.contracts]]
 name = "Stage packages are independent (they exchange artifacts, not imports)"
 type = "independence"
-modules = ["qf.data", "qf.eval", "qf.training", "qf.export", "qf.runtime", "qf.lab"]
+modules = ["qf.data", "qf.eval", "qf.training", "qf.export", "qf.runtime", "qf.lab", "qf.baselines"]
 
 [[tool.importlinter.contracts]]
 name = "QF-Lab is isolated: it may import only qf.common"
@@ -134,5 +134,5 @@ forbidden_modules = ["qf.domain"]
 [[tool.importlinter.contracts]]
 name = "Light packages never import heavy ML libraries"
 type = "forbidden"
-source_modules = ["qf.common", "qf.contracts", "qf.domain", "qf.data", "qf.eval", "qf.runtime"]
+source_modules = ["qf.common", "qf.contracts", "qf.domain", "qf.data", "qf.eval", "qf.runtime", "qf.baselines"]
 forbidden_modules = ["torch", "transformers", "peft", "bitsandbytes"]

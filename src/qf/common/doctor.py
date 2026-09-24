@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import platform
 import shutil
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ __all__ = [
     "DEFAULT_REPORT_PATH",
     "LMSTUDIO_MODELS_URL",
     "collect_environment",
+    "collect_hardware",
     "format_environment_report",
 ]
 
@@ -43,6 +45,31 @@ def _platform_info() -> dict[str, Any]:
         "machine": platform.machine(),
         "system": platform.system(),
         "python_version": platform.python_version(),
+    }
+
+
+def _chip() -> str | None:
+    """The processor name, e.g. "Apple M4 Max" (macOS); None where it cannot be read."""
+    if platform.system() != "Darwin":
+        return platform.processor() or None
+    try:
+        result = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],  # noqa: S607
+                                capture_output=True, text=True, timeout=5, check=False)  # fmt: skip
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def collect_hardware() -> dict[str, Any]:
+    """What a run manifest records about the machine (eval runs, D-108): platform, processor,
+    cores and memory. Read-only and fast; nothing about disks or packages."""
+    memory = psutil.virtual_memory()
+    return {
+        **_platform_info(),
+        "chip": _chip(),
+        "cpu_count_logical": os.cpu_count(),
+        "cpu_count_physical": psutil.cpu_count(logical=False),
+        "ram_total_bytes": memory.total,
     }
 
 

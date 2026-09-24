@@ -71,11 +71,13 @@
 
 ## Условия запуска
 
+- модель (шаг 10, D-110): GGUF `lmstudio-community/Mistral-Nemo-Instruct-2407-GGUF` @ `e0ffb632…`, `Mistral-Nemo-Instruct-2407-Q4_K_M.gguf`, sha256 `363beac6…96934`; LM Studio 0.4.25+1 на MacBook Pro (Apple M4 Max, 36 ГБ); загрузка `lms load mistral-nemo-instruct-2407 --context-length 4096 --gpu max --parallel 1`, сервер `lms server start --port 1234 --bind 127.0.0.1`. Backend `openai_local` отказывается работать, если модель загружена с другим контекстом или квантованием (`configs/eval/lmstudio_baseline_v2.yaml`);
 - `temperature 0`, `max_tokens 768`, контекст 4096, одна заявка за раз (`concurrency 1`);
 - системный промпт — тот же, что в обучающих записях: `system_extract_v2`, sha256 `fa3297296346666443f60d0318f01eed7c669032ffcacc534e8fd166544f4e41` (`bench_v2`, шаг 10 и дальше); для `bench_v1` — `system_extract_v1`, sha256 `c3188b85653eef9f7e0c810a9c30e8cc046ff897291f81f53e0d823092e6c75f`;
 - модели передаются только `messages[:2]` (system + user), без ответа ассистента;
 - сравнивать модели можно только в одном backend (HF с HF, GGUF в LM Studio с GGUF той же сборки llama.cpp) и только на одной версии benchmark + промпта + схемы;
-- на шаге 10 baseline запускается дважды: с `json_schema` (constrained decoding) и без; основной режим утверждается там же.
+- на шаге 10 baseline запускается дважды: `uv run qf eval-baseline --config configs/eval/lmstudio_baseline_v2.yaml --json-schema off` и `… --json-schema on` (схема ответа из реестра схем отправляется с каждым запросом; прогоны называются `lmstudio_baseline_v2.free` / `.schema`); основной режим утверждается там же;
+- **нижняя граница** (D-109): `uv run qf eval run --config configs/eval/baseline_empty_v2.yaml` (пустая карточка) и `… baseline_rules_v2.yaml` (правила `rules_v1`) — не модели, а точка отсчёта «без LLM» на том же `bench_v2`.
 
 ## Разбор ответа
 

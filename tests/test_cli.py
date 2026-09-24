@@ -57,7 +57,7 @@ def test_version_matches_pyproject() -> None:
 def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--help"]) == 0
     help_text = " ".join(capsys.readouterr().out.split())  # argparse wraps long lines
-    assert "[step 10, not implemented yet]" in help_text
+    assert "[step 18, not implemented yet]" in help_text
     assert "validate datasets: schema, leakage, duplicates [step 7]" in help_text
 
 

@@ -1,0 +1,16 @@
+# Step 10: how the local model is served and asked (docs/EVAL_SPEC.md, «Условия запуска»).
+# LM Studio 0.4.25+1, model loaded with:  lms load mistral-nemo-instruct-2407 --context-length 4096 --gpu max --parallel 1
+# and the server started with:           lms server start --port 1234 --bind 127.0.0.1
+backend:
+  name: openai_local
+  base_url: http://127.0.0.1:1234/v1     # loopback only; no fallback URL
+  model_substring: mistral-nemo-instruct-2407   # resolved from /v1/models, never from a file name
+  timeout_s: 180
+  stream: true                           # measures the time to the first token
+  expected_context: 4096                 # the run is refused if LM Studio loaded another context
+  expected_quantization: Q4_K_M
+  runtime: LM Studio 0.4.25+1
+generation:
+  temperature: 0.0
+  max_tokens: 768
+concurrency: 1                           # one request at a time

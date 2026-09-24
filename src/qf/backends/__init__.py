@@ -5,6 +5,7 @@ Backends get ready messages from the caller and never build prompts (they do not
 """
 
 from qf.backends.fake import TIMEOUT, FakeBackend
+from qf.backends.openai_local import LocalOpenAIClient, OpenAILocalBackend
 from qf.backends.registry import BACKENDS
 
-__all__ = ["BACKENDS", "TIMEOUT", "FakeBackend"]
+__all__ = ["BACKENDS", "TIMEOUT", "FakeBackend", "LocalOpenAIClient", "OpenAILocalBackend"]

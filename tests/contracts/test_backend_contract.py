@@ -1,27 +1,59 @@
 """Contract test of every registered generation backend (plan C.8, step 9).
 
 Each backend must be testable offline: `OFFLINE_CONFIGS` holds a configuration that needs no
-network, GPU or model (for `openai_local`, step 10: a mock transport). A backend registered
-without an entry here fails `test_every_backend_has_an_offline_config`.
+network, GPU or model (`openai_local`, step 10: a mock LM Studio). A backend registered
+without an entry here fails `test_every_backend_has_an_offline_config`. Backends that answer
+from prepared answers (`fake`, the mock server) return exactly `ANSWER`; the lower-bound
+baselines (D-109) compute a valid card_v2 answer for any request.
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from typing import Any
 
+import httpx
 import pytest
 
 import qf.cli.wiring  # noqa: F401  (every registry and lazy entry)
 from qf.backends import BACKENDS
+from qf.backends import openai_local as openai_local_module
 from qf.cli.wiring import build
 from qf.common import ComponentConfig, sha256_text
 from qf.contracts import GenerationBackend, GenerationRequest, GenerationResult, Message
+from qf.domain import get_target_schema
 
 QUESTION = "Нужна машина из Перми в Самару"
 ANSWER = '{"card": {}}'
 OFFLINE_CONFIGS: dict[str, dict[str, Any]] = {
     "fake": {"responses": {sha256_text(QUESTION): ANSWER}},
+    "openai_local": {"model_substring": "mistral", "expected_context": 4096},
+    "baseline_empty": {},
+    "baseline_rules": {},
 }
+COMPUTES_ANSWERS = {"baseline_empty", "baseline_rules"}
+
+
+def _mock_lmstudio(request: httpx.Request) -> httpx.Response:
+    """Answers QUESTION with ANSWER and anything else with HTTP 404, like a prepared server."""
+    if request.url.path == "/v1/models":
+        return httpx.Response(200, json={"data": [{"id": "mistral-nemo-instruct-2407"}]})
+    if request.url.path.startswith("/api/v0/models/"):
+        return httpx.Response(200, json={"state": "loaded", "loaded_context_length": 4096,
+                                         "quantization": "Q4_K_M"})  # fmt: skip
+    body = json.loads(request.content)
+    if body["messages"][-1]["content"] != QUESTION:
+        return httpx.Response(404, text="no prepared answer")
+    chunk = json.dumps({"choices": [{"delta": {"content": ANSWER}}]})
+    return httpx.Response(200, text=f"data: {chunk}\n\ndata: [DONE]\n\n")
+
+
+@pytest.fixture(autouse=True)
+def offline_lmstudio(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setattr(openai_local_module, "DEFAULT_TRANSPORT",
+                        httpx.MockTransport(_mock_lmstudio))  # fmt: skip
+    yield
 
 
 def request(*messages: Message) -> GenerationRequest:
@@ -46,14 +78,19 @@ def test_backend_answers_system_and_user(name: str) -> None:
     result = impl.generate(request(Message(role="system", content="s"),
                                    Message(role="user", content=QUESTION)))  # fmt: skip
     assert isinstance(result, GenerationResult)
-    assert result.ok and result.text == ANSWER and result.latency_s >= 0
+    assert result.ok and result.latency_s >= 0
+    if name in COMPUTES_ANSWERS:
+        get_target_schema("card_v2").parse(result.text)  # a strictly valid answer
+    else:
+        assert result.text == ANSWER
 
 
 @pytest.mark.parametrize("name", BACKENDS.names())
 def test_backend_errors_are_results_not_exceptions(name: str) -> None:
     impl = backend(name)
-    unknown = impl.generate(request(Message(role="user", content="no prepared answer")))
-    assert isinstance(unknown, GenerationResult) and unknown.error
+    if name not in COMPUTES_ANSWERS:  # a baseline answers any request
+        unknown = impl.generate(request(Message(role="user", content="no prepared answer")))
+        assert isinstance(unknown, GenerationResult) and unknown.error
     # a request ending with the assistant answer is never sent on: it is refused
     leaked = impl.generate(request(Message(role="user", content=QUESTION),
                                    Message(role="assistant", content=ANSWER)))  # fmt: skip

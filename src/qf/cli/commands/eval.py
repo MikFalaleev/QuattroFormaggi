@@ -17,7 +17,14 @@ from qf.eval import (
     run_eval,
 )
 
-__all__ = ["configure_compare", "configure_run", "run_compare", "run_run"]
+__all__ = [
+    "configure_baseline",
+    "configure_compare",
+    "configure_run",
+    "run_baseline",
+    "run_compare",
+    "run_run",
+]
 
 
 def configure_run(parser: argparse.ArgumentParser) -> None:
@@ -32,11 +39,34 @@ def configure_run(parser: argparse.ArgumentParser) -> None:
 
 
 def run_run(args: argparse.Namespace) -> int:
-    root = project_root()
+    return _evaluate(load_yaml_config(args.config, EvalConfig), args.resume)
+
+
+def configure_baseline(parser: argparse.ArgumentParser) -> None:
+    configure_run(parser)
+    parser.add_argument(
+        "--json-schema", choices=("on", "off"), required=True,
+        help="send the JSON schema of the answer with every request (constrained decoding) "
+             "or not; the baseline runs both",
+    )  # fmt: skip
+
+
+def run_baseline(args: argparse.Namespace) -> int:
+    """`qf eval-baseline`: the eval config run in one of the two modes of step 10; the mode is
+    part of the run name (`<name>.schema` / `<name>.free`) and of its generation settings."""
     cfg = load_yaml_config(args.config, EvalConfig)
+    on = args.json_schema == "on"
+    generation = cfg.generation.model_copy(update={"json_schema": on})
+    named = cfg.model_copy(update={"name": f"{cfg.name}.{'schema' if on else 'free'}",
+                                   "generation": generation})  # fmt: skip
+    return _evaluate(named, args.resume)
+
+
+def _evaluate(cfg: EvalConfig, resume: Path | None) -> int:
+    root = project_root()
     bench, records = load_bench(cfg, root)
     backend = build(BACKENDS, cfg.backend)
-    run = run_eval(records, backend, cfg, bench=bench, root=root, resume=args.resume)
+    run = run_eval(records, backend, cfg, bench=bench, root=root, resume=resume)
     if run.state["backend"] == "fake":
         print(FAKE_BANNER.removeprefix("> ").replace("**", ""))
     failed = sum(s.failed for s in run.scores)

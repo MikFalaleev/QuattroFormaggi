@@ -19,6 +19,7 @@ from qf.common import (
     atomic_write_text,
     read_artifact,
     read_manifest,
+    sha256_json,
     sha256_text,
     write_artifact,
 )
@@ -32,7 +33,7 @@ from qf.contracts import (
     SFTRecord,
     VariantInfo,
 )
-from qf.domain import serialize_target
+from qf.domain import get_target_schema, serialize_target
 from qf.eval import (
     FAKE_BANNER,
     METRICS_FILE,
@@ -247,7 +248,10 @@ def test_manifest_contains_bench_hash_and_prompt_hash(root: Path, bench: Any) ->
     assert manifest.prompt_hashes == {"system": sha256_text(SYSTEM)}
     assert manifest.config["backend_name"] == "fake"
     assert manifest.config["model_id"].startswith("fake:fake@")  # + hash of the answers
-    assert manifest.config["generation"] == {"max_tokens": 768, "temperature": 0.0}
+    assert manifest.config["generation"] == {"max_tokens": 768, "temperature": 0.0,
+                                             "json_schema": False}  # fmt: skip
+    assert result.state["generation"] == {"max_tokens": 768, "temperature": 0.0}  # as in step 9
+    assert manifest.hardware["ram_total_bytes"] > 0 and manifest.hardware["machine"]
     assert manifest.metrics["key_field_accuracy"] == 1.0
     predictions = read_artifact(result.run_dir / PREDICTIONS_FILE, "predictions",
                                 {"predictions_v1"}, root=root)  # fmt: skip
@@ -430,3 +434,41 @@ def test_fake_backend_rejects_bad_responses_file(root: Path) -> None:
         FakeBackend(FakeBackend.Config(responses_file=Path("bad.json")))
     with pytest.raises(QFError, match="cannot read fake responses"):
         FakeBackend(FakeBackend.Config(responses_file=root / "absent.json"))
+
+
+def test_json_schema_mode(root: Path, bench: Any) -> None:
+    """Constrained decoding (step 10): the answer schema goes with every request and is part of
+    the run's setup; without it the state keeps the form of the step 9 runs."""
+    ref, records = bench
+    backend = FakeBackend.from_answers(gold_answers(records))
+    on = GenerationSettings(json_schema=True)
+    result = run(root, bench, backend, generation=on)
+    schema = get_target_schema("card_v1").json_schema()
+    assert backend.requests and all(r.json_schema == schema for r in backend.requests)
+    assert result.state["generation"] == {"max_tokens": 768, "temperature": 0.0,
+                                          "json_schema": True}  # fmt: skip
+    assert result.state["json_schema_sha256"] == sha256_json(schema)
+    with pytest.raises(QFError, match="generation, json_schema_sha256 changed"):
+        run(root, bench, FakeBackend.from_answers(gold_answers(records)), resume=result.run_dir)
+    off = run(root, bench, FakeBackend.from_answers(gold_answers(records)))
+    assert "json_schema_sha256" not in off.state and "json_schema" not in off.state["generation"]
+    assert "json_schema True" in (result.run_dir / REPORT_FILE).read_text(encoding="utf-8")
+
+
+def test_cli_eval_baseline(root: Path, bench: Any, capsys: pytest.CaptureFixture[str]) -> None:
+    ref, records = bench
+    responses = {sha256_text(q): a for q, a in gold_answers(records).items()}
+    (root / "responses.json").write_text(json.dumps(responses, ensure_ascii=False))
+    cfg = config(ref).model_dump(mode="json")
+    cfg["backend"] = {"name": "fake", "responses_file": "responses.json"}
+    (root / "base.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+    for mode, suffix in (("on", "schema"), ("off", "free")):
+        before = set((root / "runs").iterdir()) if (root / "runs").exists() else set()
+        assert main(["eval-baseline", "--config", str(root / "base.yaml"),
+                     "--json-schema", mode]) == 0  # fmt: skip
+        (newest,) = set((root / "runs").iterdir()) - before
+        state = json.loads((newest / "eval_state.json").read_text(encoding="utf-8"))
+        assert state["name"] == f"fake_test.{suffix}"
+        assert state["generation"].get("json_schema", False) is (mode == "on")
+    assert main(["eval-baseline", "--config", str(root / "base.yaml")]) == 2  # the mode is required
+    capsys.readouterr()

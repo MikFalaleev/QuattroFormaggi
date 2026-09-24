@@ -28,6 +28,7 @@ from qf.common.doctor import (
     DEFAULT_REPORT_PATH,
     LMSTUDIO_MODELS_URL,
     collect_environment,
+    collect_hardware,
     format_environment_report,
 )
 from qf.common.errors import DataValidationError, Issue, NotImplementedStageError, QFError
@@ -93,6 +94,7 @@ __all__ = [
     "atomic_write_text",
     "canonical_json",
     "collect_environment",
+    "collect_hardware",
     "collect_git_info",
     "collect_package_versions",
     "config_hash",

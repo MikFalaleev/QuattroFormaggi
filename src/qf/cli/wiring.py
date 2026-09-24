@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 import qf.backends  # noqa: F401  (imported for its registries: BACKENDS)
+import qf.baselines  # noqa: F401  (registers the lower-bound baselines in BACKENDS, D-109)
 import qf.data  # noqa: F401  (imported for its registries: RAW_SOURCES)
 import qf.domain  # noqa: F401  (imported for its registries: TASKS)
 import qf.eval  # noqa: F401  (imported for its registries: METRICS)

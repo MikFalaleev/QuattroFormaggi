@@ -25,8 +25,10 @@ from qf.common import (
     RunRecorder,
     StrictConfig,
     atomic_write_text,
+    collect_hardware,
     read_artifact,
     sha256_file,
+    sha256_json,
     sha256_text,
     start_run,
     write_artifact,
@@ -83,6 +85,16 @@ SCORED_SCHEMAS: Final = tuple(SCORERS.names())
 class GenerationSettings(StrictConfig):
     max_tokens: int = Field(default=768, gt=0)
     temperature: float = Field(default=0.0, ge=0.0)
+    # constrained decoding: the JSON schema of the answer goes with every request (step 10)
+    json_schema: bool = False
+
+    def state(self) -> dict[str, Any]:
+        """The settings as recorded in `eval_state.json`: `json_schema` only when on, so the
+        states (and reports) of the runs made before step 10 keep their exact form."""
+        recorded = self.model_dump()
+        if not self.json_schema:
+            recorded.pop("json_schema")
+        return recorded
 
 
 class BenchRef(StrictConfig):
@@ -153,12 +165,14 @@ def _generate(backend: GenerationBackend, req: GenerationRequest) -> GenerationR
                                 error=f"backend raised {type(exc).__name__}: {exc}")  # fmt: skip
 
 
-def _request(record: SFTRecord, settings: GenerationSettings) -> GenerationRequest:
+def _request(record: SFTRecord, settings: GenerationSettings,
+             json_schema: dict[str, Any] | None) -> GenerationRequest:  # fmt: skip
     messages = record.messages[:2]
     if [m.role for m in messages] != ["system", "user"]:
         raise QFError(f"{record.id}: expected system and user messages")
     return GenerationRequest(messages=messages, max_tokens=settings.max_tokens,
-                             temperature=settings.temperature)  # fmt: skip
+                             temperature=settings.temperature,
+                             json_schema=json_schema)  # fmt: skip
 
 
 # --- metrics -------------------------------------------------------------------------------
@@ -212,20 +226,24 @@ def _state(cfg: EvalConfig, backend: GenerationBackend, bench: ArtifactRef,
     if schema not in SCORED_SCHEMAS:
         raise QFError(f"answers in {schema} cannot be scored "
                       f"(scored: {', '.join(SCORED_SCHEMAS)})")  # fmt: skip
-    return {
+    state = {
         "name": cfg.name, "backend": backend.name, "model_id": backend.model_id(),
         "bench_path": bench.path.as_posix(), "bench_sha256": bench.sha256,
         "schema_version": schema,
         "prompt_sha256": _single(records, "system prompts",
                                  lambda r: sha256_text(r.messages[0].content)),
-        "generation": cfg.generation.model_dump(), "metrics": cfg.metrics,
+        "generation": cfg.generation.state(), "metrics": cfg.metrics,
         "slice_metrics": cfg.slice_metrics or cfg.metrics, "slices": cfg.slices,
     }  # fmt: skip
+    if cfg.generation.json_schema:
+        state["json_schema_sha256"] = sha256_json(get_target_schema(schema).json_schema())
+    return state
 
 
 # What must not change when a run is resumed: otherwise its answers come from two setups.
 RESUME_KEYS: Final = (
-    "bench_sha256", "prompt_sha256", "schema_version", "generation", "backend", "model_id",
+    "bench_sha256", "prompt_sha256", "schema_version", "generation", "json_schema_sha256",
+    "backend", "model_id",
 )  # fmt: skip
 
 
@@ -260,6 +278,8 @@ def run_eval(
     atomic_write_text(run.run_dir / EVAL_STATE_FILE, json.dumps(state, indent=2) + "\n")
     predictions_path = run.run_dir / PREDICTIONS_FILE
     done = read_predictions(predictions_path, repair=True)
+    target = get_target_schema(state["schema_version"])
+    json_schema = target.json_schema() if cfg.generation.json_schema else None
     unknown = set(done) - {r.id for r in records}
     if unknown:
         raise QFError(f"{predictions_path}: answers to records outside the benchmark, "
@@ -270,14 +290,14 @@ def run_eval(
             # server went down): the later line of a record wins when predictions are read
             if record.id in done and done[record.id]["error"] is None:
                 continue
-            result = _generate(backend, _request(record, cfg.generation))
+            result = _generate(backend, _request(record, cfg.generation, json_schema))
             item = {"id": record.id, "output": result.text, **result.model_dump(exclude={"text"})}
             out.write(json.dumps(item, ensure_ascii=False) + "\n")
             out.flush()
             done[record.id] = item
-    scorer, schema = get_scorer(state["schema_version"]), get_target_schema(state["schema_version"])
+    scorer = get_scorer(state["schema_version"])
     scores = [
-        scorer.score(r.id, schema.parse(r.messages[2].content), done[r.id]["output"],
+        scorer.score(r.id, target.parse(r.messages[2].content), done[r.id]["output"],
                      generation_error=done[r.id]["error"])
         for r in records
     ]  # fmt: skip
@@ -295,6 +315,7 @@ def run_eval(
     run.finish(
         config={**cfg.model_dump(mode="json"), "backend_name": state["backend"],
                 "model_id": state["model_id"]},
+        hardware=collect_hardware(),
         data_hashes={bench.path.as_posix(): bench.sha256,
                      predictions_ref.path.as_posix(): predictions_ref.sha256,
                      metrics_ref.path.as_posix(): metrics_ref.sha256},
