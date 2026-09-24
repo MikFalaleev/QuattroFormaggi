@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qf import __version__
-from qf.cli.commands import bench, data, doctor
+from qf.cli.commands import bench, data, doctor, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -128,6 +128,13 @@ _SPECS = (
         "paired comparison of two eval runs",
         eval_cmd.run_compare,
         eval_cmd.configure_compare,
+    ),
+    CommandSpec(
+        "ui",
+        "UI",
+        "local web interface to try the data, scoring and generator by hand",
+        ui.run,
+        ui.configure,
     ),
     CommandSpec("eval-baseline", "10", "baseline of the base model in LM Studio"),
     CommandSpec("tokens audit", "11", "audit tokenizer, chat template and loss mask"),

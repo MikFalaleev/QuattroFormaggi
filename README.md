@@ -39,6 +39,8 @@ uv run python -m tests.fake_eval --bench data/splits_v2/bench_v2.jsonl        # 
 uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 ```
 
+Ручная проверка в браузере (без модели; сервер только на этом компьютере): `uv run qf ui`, затем открыть http://127.0.0.1:8765/.
+
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); QLoRA-обучение — удалённая машина Linux + NVIDIA (≥24 GB VRAM). См. `docs/PROJECT.md`, раздел 4.
 
 ## Команды
@@ -56,6 +58,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf data report [--data-dir DIR]` (`--tokenizer` — шаг 11) | 7 | реализована |
 | `qf bench export-review / import-review / freeze [--manual FILE] / verify` (`--config PATH`) | 8, V5 | реализованы; порядок — `docs/EVAL_SPEC.md`; для `card_v2` — `--config configs/eval/benchmark_v2.yaml` → `data/splits_v2/` |
 | `qf eval run --config PATH [--resume RUN_DIR]`, `qf eval compare RUN_A RUN_B` | 9, V6 | реализованы для `card_v1` и `card_v2` (backend `fake`; LM Studio — шаг 10); метрики — `docs/EVAL_SPEC.md` |
+| `qf ui [--port 8765]` | — | реализована: локальный веб-интерфейс для ручной проверки — заявки и эталоны, оценка ответа, генератор, отчёты прогонов (D-107) |
 | `qf eval-baseline` | 10 | не реализована |
 | `qf tokens audit` | 11 | не реализована |
 | `qf train estimate`, `qf train run` | 12 | не реализованы |

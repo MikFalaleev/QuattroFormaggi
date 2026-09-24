@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quattro Formaggi — ручная проверка</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #d9dde3;
+  --accent: #2f6fdf; --accent-soft: #e8f0fd; --ok: #1a7f37; --ok-soft: #e6f4ea;
+  --bad: #c62828; --bad-soft: #fdecea; --warn: #9a6700; --warn-soft: #fff4d6; --code: #f1f3f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c; --panel: #1c2027; --text: #e6e8eb; --muted: #9aa3ae; --line: #323843;
+    --accent: #6ea0ff; --accent-soft: #1f2d45; --ok: #57c27a; --ok-soft: #1a2e22;
+    --bad: #ff7b72; --bad-soft: #3a1f1f; --warn: #e3b341; --warn-soft: #362b12; --code: #232831;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+       background: var(--bg); color: var(--text); }
+header { padding: 14px 20px 0; }
+header h1 { margin: 0; font-size: 19px; }
+header p { margin: 4px 0 10px; color: var(--muted); }
+nav { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+nav button { border: 1px solid transparent; border-bottom: none; background: none; color: var(--muted);
+             padding: 8px 14px; cursor: pointer; border-radius: 6px 6px 0 0; font-size: 14px; }
+nav button.active { background: var(--panel); color: var(--text); border-color: var(--line);
+                    margin-bottom: -1px; font-weight: 600; }
+main { padding: 16px 20px 40px; }
+.tab { display: none; } .tab.active { display: block; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.cols { display: grid; grid-template-columns: minmax(320px, 40%) 1fr; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+label.inline { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+select, input[type=text], input[type=number], textarea {
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; font: inherit; }
+textarea { width: 100%; min-height: 220px; font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+button.btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 7px 14px;
+             cursor: pointer; font: inherit; }
+button.btn.secondary { background: var(--accent-soft); color: var(--accent); }
+button.btn:disabled { opacity: .5; cursor: default; }
+.list { max-height: 70vh; overflow: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+tr.pick { cursor: pointer; } tr.pick:hover { background: var(--accent-soft); }
+tr.pick.selected { background: var(--accent-soft); }
+.muted { color: var(--muted); } .small { font-size: 12.5px; }
+.request { white-space: pre-wrap; background: var(--code); border-radius: 6px; padding: 10px 12px;
+           font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre.json { white-space: pre-wrap; word-break: break-word; background: var(--code); border-radius: 6px;
+           padding: 10px 12px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; margin: 1px 3px 1px 0;
+        background: var(--code); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); } .chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+.banner { padding: 10px 12px; border-radius: 6px; margin: 10px 0; }
+.banner.ok { background: var(--ok-soft); } .banner.bad { background: var(--bad-soft); }
+.banner.warn { background: var(--warn-soft); }
+h2 { font-size: 16px; margin: 16px 0 8px; } h3 { font-size: 14.5px; margin: 14px 0 6px; }
+details summary { cursor: pointer; color: var(--accent); margin: 8px 0; }
+.error { color: var(--bad); white-space: pre-wrap; }
+.report h2 { font-size: 18px; } .report h3 { font-size: 15.5px; } .report h4 { font-size: 14px; }
+.report table { margin: 6px 0 12px; font-size: 13px; } .report td, .report th { padding: 3px 7px; }
+.report blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--warn);
+                     background: var(--warn-soft); }
+.report pre { white-space: pre-wrap; background: var(--code); padding: 8px 10px; border-radius: 6px;
+              font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+code { background: var(--code); padding: 0 4px; border-radius: 4px; font-size: 12.5px; }
+.kv td:first-child { color: var(--muted); width: 38%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Quattro Formaggi — ручная проверка</h1>
+  <p>Без модели: заявки и эталоны, оценка ответа так, как её посчитает eval, генератор заявок и отчёты прогонов. Всё работает локально и ничего не записывает в проект.</p>
+</header>
+<nav>
+  <button data-tab="data" class="active">Заявки и эталоны</button>
+  <button data-tab="check">Проверка ответа</button>
+  <button data-tab="generate">Новая заявка</button>
+  <button data-tab="runs">Прогоны оценки</button>
+</nav>
+<main>
+
+<section id="tab-data" class="tab active">
+  <div class="row">
+    <label class="inline">Набор <select id="dataset"></select></label>
+    <label class="inline">Вид <select id="f-kind"><option value="">все</option></select></label>
+    <label class="inline">Трудный случай <select id="f-hard"><option value="">все</option></select></label>
+    <label class="inline">Транспорт <select id="f-equip"><option value="">любой</option></select></label>
+    <label class="inline">Условие <select id="f-cond"><option value="">любое</option></select></label>
+    <label class="inline">Язык <select id="f-lang"><option value="">все</option><option>ru</option><option>en</option></select></label>
+    <input type="text" id="f-text" placeholder="поиск по тексту или id" size="24">
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <div class="small muted" id="list-count"></div>
+      <div class="list"><table><thead><tr><th>id</th><th>вид</th><th>транспорт</th><th>условия</th></tr></thead>
+        <tbody id="list"></tbody></table></div>
+    </div>
+    <div class="panel" id="detail"><span class="muted">Выберите заявку в списке слева.</span></div>
+  </div>
+</section>
+
+<section id="tab-check" class="tab">
+  <div class="panel">
+    <div id="check-target" class="muted">Заявка не выбрана: ответ проверяется только по правилам схемы, без эталона. Чтобы сравнить с эталоном, выберите заявку на вкладке «Заявки и эталоны» или «Новая заявка» и нажмите «Проверить свой ответ».</div>
+    <div class="row" id="schema-row" style="margin-top:10px">
+      <label class="inline">Схема <select id="check-schema"><option>card_v2</option><option>card_v1</option></select></label>
+    </div>
+    <h3>Ответ (так, как его напишет модель)</h3>
+    <div class="row small">
+      <button class="btn secondary" data-mut="gold">Эталон</button>
+      <button class="btn secondary" data-mut="swap">Поменять «откуда» и «куда»</button>
+      <button class="btn secondary" data-mut="dropcond">Потерять первое условие</button>
+      <button class="btn secondary" data-mut="addtemp">Добавить температуру +2…+6</button>
+      <button class="btn secondary" data-mut="pieces1">Число мест = 1</button>
+      <button class="btn secondary" data-mut="fence">Обернуть в ```json</button>
+      <button class="btn secondary" data-mut="break">Сломать JSON</button>
+    </div>
+    <textarea id="answer" spellcheck="false" placeholder='{"card": {...}, "missing_fields": [...], "conflicts": [...]}'></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" id="score-btn">Оценить</button>
+      <span class="small muted">Кнопки выше портят ответ типичными ошибками модели — посмотрите, как их посчитают метрики.</span></div>
+  </div>
+  <div id="check-result"></div>
+</section>
+
+<section id="tab-generate" class="tab">
+  <div class="panel">
+    <div class="row">
+      <label class="inline">Загрузка <input type="text" id="g-load" placeholder="пусто — случайная" size="16"></label>
+      <label class="inline">Семейство <select id="g-family"><option value="">по конфигу</option></select></label>
+      <label class="inline">Вид заявки <select id="g-kind"></select></label>
+      <button class="btn" id="g-new">Сгенерировать</button>
+      <button class="btn secondary" id="g-again" disabled>Ещё вариант того же</button>
+    </div>
+    <div class="small muted" id="g-info">Генератор card_v2 (configs/data/generate_v2.yaml) строит заявку из фактов загрузки; эталон считает код, не модель.</div>
+  </div>
+  <div id="g-result"></div>
+</section>
+
+<section id="tab-runs" class="tab">
+  <div class="cols">
+    <div class="panel"><div class="list"><table><thead><tr><th>прогон</th><th>что</th></tr></thead><tbody id="runs"></tbody></table></div></div>
+    <div class="panel report" id="report"><span class="muted">Выберите прогон слева.</span></div>
+  </div>
+</section>
+
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+async function api(path, body) {
+  const options = body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)};
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+function showError(target, error) { target.innerHTML = `<div class="banner bad error">${esc(error.message || error)}</div>`; }
+
+// --- labels ------------------------------------------------------------------------------
+const FIELD = {shipper_name: "Отправитель", cargo_category: "Категория груза", equipment_type: "Тип транспорта",
+  pieces: "Мест", weight_total: "Общая масса", weight_per_piece: "Масса одного места", origin: "Откуда",
+  destination: "Куда", pickup_date: "Загрузка", delivery_date: "Выгрузка", temperature_c: "Температура, °C",
+  special_conditions: "Особые условия"};
+const EQUIP = {tent: "тент", van: "цельнометаллический фургон", reefer: "рефрижератор", isotherm: "изотерм",
+  container: "контейнеровоз", lowbed: "трал", mega: "мега", flatbed: "бортовая платформа",
+  dry_van: "фургон/тент (v1)"};
+const CATEGORY = {general: "генеральный груз", retail: "ритейл", consumer_goods: "ТНП", food_beverage: "продукты и напитки",
+  automotive: "автозапчасти", electronics: "электроника", machinery: "спецтехника и оборудование"};
+const COND = {temperature: "температурный режим", securing: "крепление", packaging: "упаковка",
+  oversize: "негабарит", sensors: "датчики"};
+const VALUE = {straps: "ремни", chains: "цепи", wheel_chocks: "противооткатные упоры", anti_slip_mats: "антискользящие коврики",
+  load_bars: "распорные штанги", crate: "обрешётка", stretch_film: "стрейч-плёнка", moisture_protection: "влагозащитная",
+  shock_protection: "амортизирующая", temperature: "температура", humidity: "влажность", pressure: "давление",
+  tilt: "наклон", shock: "удары", door_opening: "открытие дверей"};
+const KIND = {clean: "чистые", conditions: "с условиями", missing: "выпавшие поля", hard: "трудные", manual: "ручные и моки"};
+const HARD = {clean: "нет", manual: "ручная заявка / мок", dropped_fields: "выпавшие поля", per_piece_weight: "масса одного места",
+  conflict_weight: "два разных веса", conflict_pieces: "два разных числа мест", relative_date: "«завтра», «послезавтра»",
+  distractor_numbers: "посторонние числа", city_lang_switch: "город на другом языке",
+  condition_no_values: "условие без значений", required_condition_dropped: "нет обязательного условия",
+  oversize_partial: "не все габариты трала", conditions_scattered: "условия вразброс"};
+const CRITICAL = {pieces_weight_swap: "перепутаны места и масса", wrong_unit_magnitude: "ошибка единиц массы",
+  origin_destination_swap: "перепутаны «откуда» и «куда»", hallucinated_required_field: "выдуманное обязательное значение",
+  missed_conflict: "пропущено противоречие", hallucinated_condition: "выдуманное условие", missed_condition: "пропущено условие"};
+const hardLabel = (h) => h.split(",").map((x) => HARD[x] || x).join(", ");
+const missingLabel = (m) => m.startsWith("special_conditions.") ? `условие: ${COND[m.split(".")[1]] || m}` : (FIELD[m] || m);
+
+function num(n) { return typeof n === "number" ? String(n).replace(".", ",") : String(n); }
+function signed(n) { return n > 0 ? `+${num(n)}` : num(n).replace("-", "−"); }
+function length(l) { return l ? `${num(l.value)} ${l.unit === "m" ? "м" : "см"}` : "—"; }
+function condition(c) {
+  if (!c) return "—";
+  if (c.kind === "temperature") {
+    if (c.min_c == null && c.max_c == null) return "температурный режим без значений";
+    if (c.min_c == null) return `не выше ${signed(c.max_c)} °C`;
+    if (c.max_c == null) return `не ниже ${signed(c.min_c)} °C`;
+    return c.min_c === c.max_c ? `${signed(c.min_c)} °C` : `от ${signed(c.min_c)} до ${signed(c.max_c)} °C`;
+  }
+  if (c.kind === "oversize") {
+    if (!c.length && !c.width && !c.height) return "негабарит без размеров";
+    return `негабарит: длина ${length(c.length)}, ширина ${length(c.width)}, высота ${length(c.height)}`;
+  }
+  const values = c.methods || c.types || c.parameters || [];
+  return `${COND[c.kind]}: ${values.length ? values.map((v) => VALUE[v] || v).join(", ") : "без значений"}`;
+}
+function value(field, v) {
+  if (v === null || v === undefined) return '<span class="muted">null</span>';
+  if (field === "special_conditions") return v.length ? v.map((c) => esc(condition(c))).join("<br>") : '<span class="muted">нет</span>';
+  if (field === "equipment_type") return `${esc(EQUIP[v] || v)} <span class="muted small">${esc(v)}</span>`;
+  if (field === "cargo_category") return `${esc(CATEGORY[v] || v)} <span class="muted small">${esc(v)}</span>`;
+  if (v && typeof v === "object" && "city" in v) return `${esc(v.city)} <span class="muted small">(${esc(v.region)})</span>`;
+  if (v && typeof v === "object" && "value" in v) return `${esc(num(v.value))} ${esc(v.unit)}`;
+  return esc(v);
+}
+function cardTable(target, flag) {
+  const rows = Object.entries(target.card).map(([f, v]) => `<tr><td>${esc(FIELD[f] || f)}</td><td>${value(f, v)}</td></tr>`);
+  if (flag) rows.push(`<tr><td>Особые условия: да/нет <span class="muted small">(считает код)</span></td><td>${esc(flag)}</td></tr>`);
+  const missing = target.missing_fields.length ? target.missing_fields.map((m) => `<span class="chip warn">${esc(missingLabel(m))}</span>`).join("") : '<span class="muted">нет</span>';
+  const conflicts = target.conflicts.length ? target.conflicts.map((c) => `<span class="chip bad">${esc(FIELD[c.field] || c.field)}: ${c.values.map((x) => esc(typeof x === "object" ? `${num(x.value)} ${x.unit}` : x)).join(" / ")}</span>`).join("") : '<span class="muted">нет</span>';
+  return `<table class="kv">${rows.join("")}
+    <tr><td>Недостающие поля <span class="muted small">(спросить у клиента)</span></td><td>${missing}</td></tr>
+    <tr><td>Противоречия</td><td>${conflicts}</td></tr></table>`;
+}
+function recordView(r, options = {}) {
+  const variant = r.variant || {};
+  return `<div class="row small">
+      <span class="chip">${esc(r.id)}</span><span class="chip">${esc(r.schema)}</span><span class="chip">${esc(r.language)}</span>
+      <span class="chip">семейство ${esc(r.family)}</span><span class="chip">${esc(KIND[r.kind] || r.kind)}</span>
+      <span class="chip">трудный случай: ${esc(hardLabel(r.hard_case))}</span>${r.synthetic ? "" : '<span class="chip ok">настоящая заявка</span>'}
+    </div>
+    <h3>Текст заявки (что увидит модель)</h3><div class="request">${esc(r.text)}</div>
+    <h3>Эталонная карточка</h3>${cardTable(r.gold, r.special_conditions_flag)}
+    <div class="row" style="margin-top:10px"><button class="btn" data-try="${esc(r.dataset)}|${esc(r.id)}">Проверить свой ответ →</button>
+      ${options.extra || ""}</div>
+    <details><summary>Эталонный ответ JSON (как его должна написать модель)</summary><pre class="json">${esc(r.gold_text)}</pre></details>
+    <details><summary>Параметры генерации (variant)</summary><pre class="json">${esc(JSON.stringify(variant, null, 2))}</pre></details>`;
+}
+
+// --- tabs --------------------------------------------------------------------------------
+function openTab(name) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.id === `tab-${name}`));
+  if (name === "runs") loadRuns();
+}
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
+
+// --- data tab ----------------------------------------------------------------------------
+let rows = [];
+let selectedId = null;
+async function loadDatasets(selected) {
+  try {
+    const sets = await api("/api/datasets");
+    $("dataset").innerHTML = sets.map((d) => `<option value="${esc(d.id)}">${esc(d.label)}</option>`).join("");
+    if (!sets.length) { $("detail").innerHTML = '<div class="banner warn">Нет данных: соберите их командами из README (qf data build, qf bench freeze).</div>'; return; }
+    if (selected && sets.some((d) => d.id === selected)) $("dataset").value = selected;
+    await loadRecords();
+  } catch (e) { showError($("detail"), e); }
+}
+function fillFilter(id, values, labels) {
+  const current = $(id).value;
+  const first = $(id).options[0].outerHTML;
+  $(id).innerHTML = first + [...values].sort().map((v) => `<option value="${esc(v)}">${esc(labels ? (labels[v] || v) : v)}</option>`).join("");
+  if ([...values].includes(current)) $(id).value = current;
+}
+async function loadRecords() {
+  $("list").innerHTML = '<tr><td colspan="4" class="muted">загрузка…</td></tr>';
+  try {
+    rows = await api(`/api/records?dataset=${encodeURIComponent($("dataset").value)}`);
+    fillFilter("f-kind", new Set(rows.map((r) => r.kind)), KIND);
+    fillFilter("f-hard", new Set(rows.flatMap((r) => r.hard_case.split(","))), HARD);
+    fillFilter("f-equip", new Set(rows.map((r) => r.equipment).filter(Boolean)), EQUIP);
+    fillFilter("f-cond", new Set(rows.flatMap((r) => r.conditions)), COND);
+    renderList();
+  } catch (e) { $("list").innerHTML = ""; showError($("detail"), e); }
+}
+function renderList() {
+  const f = {kind: $("f-kind").value, hard: $("f-hard").value, equip: $("f-equip").value, cond: $("f-cond").value,
+             lang: $("f-lang").value, text: $("f-text").value.trim().toLowerCase()};
+  const shown = rows.filter((r) => (!f.kind || r.kind === f.kind) && (!f.hard || r.hard_case.split(",").includes(f.hard))
+    && (!f.equip || r.equipment === f.equip) && (!f.cond || r.conditions.includes(f.cond)) && (!f.lang || r.language === f.lang)
+    && (!f.text || r.id.toLowerCase().includes(f.text) || r.excerpt.toLowerCase().includes(f.text)));
+  const limit = 400;
+  $("list-count").textContent = `Показано ${Math.min(shown.length, limit)} из ${shown.length} (всего в наборе ${rows.length})`;
+  $("list").innerHTML = shown.slice(0, limit).map((r) => `<tr class="pick${r.id === selectedId ? " selected" : ""}" data-id="${esc(r.id)}">
+      <td><div>${esc(r.id)}</div><div class="small muted">${esc(r.excerpt)}</div></td><td>${esc(KIND[r.kind] || r.kind)}</td>
+      <td>${esc(EQUIP[r.equipment] || r.equipment || "—")}</td><td>${r.conditions.map((c) => esc(COND[c] || c)).join(", ") || '<span class="muted">—</span>'}</td></tr>`).join("");
+}
+async function showRecord(id) {
+  selectedId = id;
+  renderList();
+  $("detail").innerHTML = '<span class="muted">загрузка…</span>';
+  try {
+    const r = await api(`/api/record?dataset=${encodeURIComponent($("dataset").value)}&id=${encodeURIComponent(id)}`);
+    $("detail").innerHTML = recordView(r);
+  } catch (e) { showError($("detail"), e); }
+}
+$("dataset").addEventListener("change", () => { selectedId = null; loadRecords(); });
+["f-kind", "f-hard", "f-equip", "f-cond", "f-lang"].forEach((id) => $(id).addEventListener("change", renderList));
+$("f-text").addEventListener("input", renderList);
+$("list").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) showRecord(tr.dataset.id); });
+
+// --- check tab ---------------------------------------------------------------------------
+let current = null;  // {dataset, id, schema, goldText}
+document.addEventListener("click", async (e) => {
+  const button = e.target.closest("button[data-try]");
+  if (!button) return;
+  const [dataset, id] = button.dataset.try.split("|");
+  try {
+    const r = await api(`/api/record?dataset=${encodeURIComponent(dataset)}&id=${encodeURIComponent(id)}`);
+    current = {dataset, id, schema: r.schema, goldText: r.gold_text};
+    $("check-target").innerHTML = `<div class="row small"><b>Сравнение с эталоном заявки</b><span class="chip">${esc(id)}</span>
+        <span class="chip">${esc(r.schema)}</span><button class="btn secondary" id="forget">без эталона</button></div>
+      <div class="request">${esc(r.text)}</div>`;
+    $("schema-row").style.display = "none";
+    $("answer").value = r.gold_text;
+    $("check-result").innerHTML = "";
+    openTab("check");
+  } catch (err) { alertBox(err); }
+});
+function alertBox(err) { $("check-result").innerHTML = ""; showError($("check-result"), err); openTab("check"); }
+document.addEventListener("click", (e) => {
+  if (e.target.id !== "forget") return;
+  current = null;
+  $("check-target").innerHTML = "Заявка не выбрана: ответ проверяется только по правилам схемы, без эталона.";
+  $("schema-row").style.display = "";
+  $("check-result").innerHTML = "";
+});
+function mutate(kind) {
+  const box = $("answer");
+  if (kind === "gold") { if (current) box.value = current.goldText; return; }
+  if (kind === "fence") { box.value = "```json\n" + box.value.trim() + "\n```"; return; }
+  if (kind === "break") { box.value = box.value.slice(0, Math.floor(box.value.length / 2)); return; }
+  let a;
+  try { a = JSON.parse(box.value.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")); } catch { $("check-result").innerHTML = '<div class="banner warn">Ответ сейчас не JSON — сначала нажмите «Эталон».</div>'; return; }
+  const card = a.card || {};
+  if (kind === "swap") [card.origin, card.destination] = [card.destination, card.origin];
+  if (kind === "dropcond" && Array.isArray(card.special_conditions)) card.special_conditions.shift();
+  if (kind === "addtemp" && Array.isArray(card.special_conditions) && !card.special_conditions.some((c) => c.kind === "temperature")) {
+    card.special_conditions.unshift({kind: "temperature", min_c: 2, max_c: 6});
+    a.missing_fields = (a.missing_fields || []).filter((m) => m !== "special_conditions.temperature");
+  }
+  if (kind === "pieces1") { card.pieces = 1; a.missing_fields = (a.missing_fields || []).filter((m) => m !== "pieces"); }
+  box.value = JSON.stringify(a);
+}
+document.querySelectorAll("button[data-mut]").forEach((b) => b.addEventListener("click", () => mutate(b.dataset.mut)));
+
+function formatBlock(check) {
+  const line = (title, part) => `<div>${title}: ${part.ok ? '<span class="ok">да</span>' : `<span class="bad">нет</span> <span class="small muted">${esc(part.error)}</span>`}</div>`;
+  return `<h3>Формат</h3>${line("Строгий разбор (json_valid_rate)", check.strict)}${line("Мягкий разбор (пробелы, одна обёртка ```)", check.lenient)}`;
+}
+function rulesBlock(check) {
+  if (!check.lenient.ok) return "";
+  const issues = check.consistency.length ? `<ul>${check.consistency.map((i) => `<li class="warn">${esc(i)}</li>`).join("")}</ul>` : '<div class="ok">нарушений нет</div>';
+  return `<h3>Правила схемы в ответе</h3>
+    <div class="small">Недостающие поля по правилу кода: ${check.missing_by_rule.map((m) => `<span class="chip">${esc(missingLabel(m))}</span>`).join("") || '<span class="muted">нет</span>'}</div>
+    ${issues}<details><summary>Каноническая запись ответа</summary><pre class="json">${esc(check.canonical)}</pre></details>`;
+}
+function scoreView(result) {
+  const s = result.score;
+  const parts = [];
+  if (result.failed) parts.push(`<div class="banner bad"><b>Ответ не оценён (неуспешный).</b> Все поля эталона считаются неверными, критические ошибки не оцениваются.</div>`);
+  else if (s.critical_errors.length) parts.push(`<div class="banner bad"><b>Критические ошибки:</b> ${s.critical_errors.map((c) => `<span class="chip bad">${esc(CRITICAL[c] || c)} <span class="small">${esc(c)}</span></span>`).join("")}</div>`);
+  else parts.push('<div class="banner ok"><b>Критических ошибок нет.</b></div>');
+  const mark = (v) => v === null || v === undefined ? '<span class="muted">—</span>' : v ? '<span class="ok">✓ верно</span>' : '<span class="bad">✗ неверно</span>';
+  parts.push(`<h3>Итог кейса</h3><table class="kv">
+    <tr><td>Ключевые поля (key_field_accuracy)</td><td>${mark(s.key_fields_correct)}</td></tr>
+    <tr><td>Недостающие поля совпали (missing_exact)</td><td>${mark(s.missing_exact)} <span class="small muted">верно найдено ${s.missing_tp}, лишних ${s.missing_fp}, пропущено ${s.missing_fn}</span></td></tr>
+    <tr><td>Противоречие найдено (conflict_recall)</td><td>${mark(s.conflict_detected)}</td></tr>
+    <tr><td>Выдуманные поля (hallucination)</td><td>${s.hallucinated_fields.length ? s.hallucinated_fields.map((f) => `<span class="chip bad">${esc(FIELD[f] || f)}</span>`).join("") : '<span class="muted">нет</span>'}</td></tr>
+    ${s.notes.length ? `<tr><td>Заметки</td><td>${s.notes.map((n) => `<span class="chip warn">${esc(n)}</span>`).join("")}</td></tr>` : ""}
+    </table>`);
+  parts.push(`<h3>Поля</h3><table><thead><tr><th>поле</th><th>эталон</th><th>ответ</th><th></th></tr></thead><tbody>
+    ${result.fields.map((f) => `<tr><td>${esc(FIELD[f.field] || f.field)}</td><td>${value(f.field, f.gold)}</td><td>${result.failed ? '<span class="muted">—</span>' : value(f.field, f.answer)}</td><td>${mark(f.correct)}</td></tr>`).join("")}</tbody></table>`);
+  if (s.condition_correct) {
+    const gold = Object.fromEntries((result.gold.card.special_conditions || []).map((c) => [c.kind, c]));
+    const answer = Object.fromEntries(((result.check.card || {}).special_conditions || []).map((c) => [c.kind, c]));
+    parts.push(`<h3>Особые условия по видам</h3><table><thead><tr><th>вид</th><th>эталон</th><th>ответ</th><th></th></tr></thead><tbody>
+      ${Object.entries(s.condition_correct).map(([k, v]) => `<tr><td>${esc(COND[k])}</td><td>${gold[k] ? esc(condition(gold[k])) : '<span class="muted">нет</span>'}</td><td>${answer[k] ? esc(condition(answer[k])) : '<span class="muted">нет</span>'}</td><td>${mark(v)}</td></tr>`).join("")}</tbody></table>`);
+  }
+  const miss = (list) => list.map((m) => `<span class="chip">${esc(missingLabel(m))}</span>`).join("") || '<span class="muted">нет</span>';
+  parts.push(`<h3>Недостающие поля</h3><table class="kv"><tr><td>эталон</td><td>${miss(result.gold.missing_fields)}</td></tr>
+    <tr><td>ответ</td><td>${result.check.lenient.ok ? miss(result.check.missing_fields) : "—"}</td></tr></table>`);
+  parts.push(formatBlock(result.check), rulesBlock(result.check));
+  parts.push(`<details><summary>CaseScore целиком (то, что пишет scores.jsonl)</summary><pre class="json">${esc(JSON.stringify(s, null, 2))}</pre></details>`);
+  return `<div class="panel" style="margin-top:14px">${parts.join("")}</div>`;
+}
+function checkView(check) {
+  const parts = [formatBlock(check)];
+  if (check.lenient.ok) parts.push(`<h3>Карточка из ответа</h3>${cardTable({card: check.card, missing_fields: check.missing_fields, conflicts: check.conflicts}, check.special_conditions_flag)}`, rulesBlock(check));
+  return `<div class="panel" style="margin-top:14px">${parts.join("")}</div>`;
+}
+$("score-btn").addEventListener("click", async () => {
+  const target = $("check-result");
+  target.innerHTML = '<div class="muted" style="margin-top:10px">считаю…</div>';
+  try {
+    if (current) target.innerHTML = scoreView(await api("/api/score", {dataset: current.dataset, id: current.id, answer: $("answer").value}));
+    else target.innerHTML = checkView(await api("/api/check", {schema: $("check-schema").value, answer: $("answer").value}));
+  } catch (e) { showError(target, e); }
+});
+
+// --- generate tab ------------------------------------------------------------------------
+let lastChoice = null;
+async function loadGenerator() {
+  try {
+    const o = await api("/api/generator");
+    $("g-family").innerHTML = '<option value="">по конфигу</option>' + o.families.map((f) => `<option value="${esc(f.name)}">${esc(f.name)} (${esc(f.language)}${f.ood ? ", только test_ood" : ""})</option>`).join("");
+    const kinds = [["", "по конфигу (случайно)"], ["clean", "чистая"], ["hard", "любой трудный случай v1"], ["conditions", "любой трудный случай условий"],
+      ...o.hard_cases.map((h) => [h, `трудный случай: ${HARD[h] || h}`])];
+    $("g-kind").innerHTML = kinds.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+    $("g-info").textContent = `Генератор card_v2 (configs/data/generate_v2.yaml) строит заявку из фактов загрузки (${o.loads} загрузок); эталон считает код, не модель.`;
+  } catch (e) { showError($("g-result"), e); }
+}
+async function generate(choice) {
+  $("g-result").innerHTML = '<div class="muted" style="margin-top:10px">генерирую…</div>';
+  try {
+    const r = await api("/api/generate", choice);
+    lastChoice = {...choice, load_id: r.facts.load_id};
+    $("g-again").disabled = false;
+    const facts = Object.entries(r.facts).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(typeof v === "object" ? JSON.stringify(v) : v)}</td></tr>`).join("");
+    const warning = r.warning ? `<div class="banner warn">${esc(r.warning)}</div>` : "";
+    $("g-result").innerHTML = `<div class="panel" style="margin-top:14px">${warning}${recordView(r)}
+      <details><summary>Факты загрузки (из данных, после замены городов и назначения транспорта)</summary><table class="kv">${facts}</table></details></div>`;
+    loadDatasets($("dataset").value);
+  } catch (e) { showError($("g-result"), e); }
+}
+const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
+$("g-new").addEventListener("click", () => generate({load_id: $("g-load").value.trim(), family: $("g-family").value, kind: $("g-kind").value, seed: randomSeed()}));
+$("g-again").addEventListener("click", () => lastChoice && generate({...lastChoice, seed: randomSeed()}));
+
+// --- runs tab ----------------------------------------------------------------------------
+async function loadRuns() {
+  try {
+    const runs = await api("/api/runs");
+    $("runs").innerHTML = runs.map((r) => `<tr class="pick" data-run="${esc(r.id)}"><td>${esc(r.id)}</td><td>${r.type === "eval"
+      ? `${esc(r.name)} <div class="small muted">${esc(r.schema)}, ${esc(r.backend)}${r.backend === "fake" ? " (не модель)" : ""}</div>` : "сравнение прогонов"}</td></tr>`).join("")
+      || '<tr><td colspan="2" class="muted">Прогонов оценки пока нет.</td></tr>';
+  } catch (e) { showError($("report"), e); }
+}
+$("runs").addEventListener("click", async (e) => {
+  const tr = e.target.closest("tr[data-run]");
+  if (!tr) return;
+  try { $("report").innerHTML = markdown((await api(`/api/run?id=${encodeURIComponent(tr.dataset.run)}`)).markdown); }
+  catch (err) { showError($("report"), err); }
+});
+function inline(text) {
+  return esc(text).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+}
+function tableHtml(lines) {
+  const cells = (line) => line.replace(/^\|/, "").replace(/\|\s*$/, "").split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
+  const body = lines.filter((l) => !/^\|[\s:|-]+\|?\s*$/.test(l));
+  const [head, ...rest] = body;
+  return `<table><thead><tr>${cells(head).map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${rest.map((l) => `<tr>${cells(l).map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function markdown(source) {
+  const lines = source.split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length;) {
+    const line = lines[i];
+    const fence = line.match(/^(`{3,})/);
+    if (fence) {
+      const buf = []; i++;
+      while (i < lines.length && lines[i] !== fence[1]) buf.push(lines[i++]);
+      i++; out.push(`<pre>${esc(buf.join("\n"))}</pre>`); continue;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    if (heading) { const n = heading[1].length + 1; out.push(`<h${n}>${inline(heading[2])}</h${n}>`); i++; continue; }
+    if (line.startsWith("|")) { const buf = []; while (i < lines.length && lines[i].startsWith("|")) buf.push(lines[i++]); out.push(tableHtml(buf)); continue; }
+    if (line.startsWith(">")) { const buf = []; while (i < lines.length && lines[i].startsWith(">")) buf.push(lines[i++].replace(/^>\s?/, "")); out.push(`<blockquote>${inline(buf.join(" "))}</blockquote>`); continue; }
+    if (/^\s*- /.test(line)) { const buf = []; while (i < lines.length && /^\s*- /.test(lines[i])) buf.push(lines[i++].replace(/^\s*- /, "")); out.push(`<ul>${buf.map((x) => `<li>${inline(x)}</li>`).join("")}</ul>`); continue; }
+    if (!line.trim()) { i++; continue; }
+    const buf = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\||>|`{3}|\s*- )/.test(lines[i])) buf.push(lines[i++]);
+    out.push(`<p>${inline(buf.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+loadDatasets();
+loadGenerator();
+</script>
+</body>
+</html>

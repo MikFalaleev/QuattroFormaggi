@@ -30,6 +30,7 @@ PLANNED_COMMANDS = {
     "eval run",
     "eval-baseline",
     "eval compare",
+    "ui",  # local web interface for manual testing, by the user's decision (D-107)
     "tokens audit",
     "train estimate",
     "train run",
