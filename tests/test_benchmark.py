@@ -147,15 +147,15 @@ def test_export_refuses_to_overwrite_verdicts(
 # --- review --------------------------------------------------------------------------------
 
 
-def test_card_v2_records_are_refused_before_v5(project: Path) -> None:
-    """The stage selects and freezes card_v1 only (D-089); a card_v2 record is an explicit
-    error, not a parse failure somewhere in the review Markdown."""
+def test_records_of_another_schema_are_refused(project: Path) -> None:
+    """A benchmark has one answer schema (bench_v1: card_v1); a card_v2 record in its source is
+    an explicit error, not a parse failure somewhere in the review Markdown."""
     path = project / GENERATED / "test.jsonl"
     records, _ = read_sft_records(path)
     records[0] = make_record_v2(id=records[0].id, group_id=records[0].group_id, split="test")
     write_sft_records(records, path, run_id="run-x", parents=[], root=project)
-    assert "card_v1" in BENCH_SCHEMAS
-    with pytest.raises(QFError, match="card_v2 cannot be put in a benchmark yet"):
+    assert set(BENCH_SCHEMAS) == {"card_v1", "card_v2"}
+    with pytest.raises(QFError, match="records in card_v2 do not belong in a card_v1 benchmark"):
         export_review(config(project), root=project)
 
 

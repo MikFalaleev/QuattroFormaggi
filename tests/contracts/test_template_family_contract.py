@@ -1,4 +1,4 @@
-"""Contract test of every registered template family x hard case (plan C.8, invariants E1-E17).
+"""Contract test of every registered template family x hard case (plan C.8, invariants E1-E18).
 
 A new family or hard case registered in `TEMPLATE_FAMILIES` / `HARD_CASES` is checked here
 without writing new tests: card_v1 with the cases that apply to card_v1 facts, card_v2 with

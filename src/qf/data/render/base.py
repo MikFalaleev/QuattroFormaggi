@@ -38,7 +38,7 @@ from qf.contracts import (
 )
 from qf.data.render.conditions import ConditionStyle, condition_fragments
 from qf.data.render.fields import Fragment, build_fragments
-from qf.data.render.vocabulary import VOCABULARIES
+from qf.data.render.vocabulary import RU_FEMININE_EQUIPMENT, VOCABULARIES
 from qf.domain import compute_missing_fields, compute_missing_fields_v2
 
 __all__ = [
@@ -49,6 +49,7 @@ __all__ = [
     "RenderError",
     "Slot",
     "assemble",
+    "agree",
     "assemble_v2",
     "fill_layout",
 ]
@@ -58,6 +59,11 @@ Slot = tuple[str, ...]
 Layout = tuple[Slot, ...]
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
+_RU_FEMININE_FRAMES: Final[tuple[tuple[str, str], ...]] = (
+    ("Нужен {equipment}", "Нужна {equipment}"), ("нужен {equipment}", "нужна {equipment}"),
+    ("{equipment} нужен", "{equipment} нужна"), ("ищу {equipment}", "нужна {equipment}"),
+)  # fmt: skip
+_EN_VOWEL_FRAMES: Final[tuple[tuple[str, str], ...]] = (("a {equipment}", "an {equipment}"),)
 _DOUBLE_DOT = re.compile(r"(?<!\.)\.\.(?!\.)")
 
 
@@ -240,6 +246,29 @@ _CONDITION_FRAGMENTS: Final[
 _FACTS_TYPES: Final[dict[str, type]] = {"card_v1": LoadFacts, "card_v2": LoadFactsV2}
 
 
+def agree(layout: Layout, fragments: Mapping[str, Fragment], language: Language) -> Layout:
+    """The layout with its equipment sentences agreed with the chosen equipment word: the
+    templates say «Нужен {equipment}», «ищу {equipment}» and «a {equipment}», so a feminine word
+    gets «Нужна» («ищу фура» becomes «нужна фура») and a word starting with a vowel gets «an».
+    The words themselves (the evidence) never change and no random number is drawn."""
+    equipment = fragments.get("equipment")
+    if equipment is None:
+        return layout
+    if language == "ru" and equipment.text in RU_FEMININE_EQUIPMENT:
+        frames = _RU_FEMININE_FRAMES
+    elif language == "en" and equipment.text[:1].lower() in "aeio":
+        frames = _EN_VOWEL_FRAMES
+    else:
+        return layout
+
+    def fix(sentence: str) -> str:
+        for old, new in frames:
+            sentence = sentence.replace(old, new)
+        return sentence
+
+    return tuple(tuple(fix(sentence) for sentence in slot) for slot in layout)
+
+
 class LayoutFamily:
     """Base of the template families: `slots` (name -> alternatives) and `orders` (sequences of
     slot names, at least five). Subclasses set the class attributes and register themselves."""
@@ -293,7 +322,8 @@ class LayoutFamily:
                                                                  self.condition_style)  # fmt: skip
         fragments |= conditions
         order = self.orders[rng.randrange(len(self.orders))]
-        layout = self._layout(order, sorted(conditions), draft, rng)
+        layout = agree(self._layout(order, sorted(conditions), draft, rng), fragments,
+                       self.language)  # fmt: skip
         text, evidence = fill_layout(layout, fragments, rng, self.joiner,
                                      capitalize=self.capitalize)  # fmt: skip
         return ASSEMBLERS[draft.schema_version](text, evidence, draft)

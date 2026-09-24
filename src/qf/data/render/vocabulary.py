@@ -31,6 +31,7 @@ __all__ = [
     "EN_SENSORS",
     "EQUIPMENT_WORDS_SLANG_V2",
     "EQUIPMENT_WORDS_V2",
+    "RU_FEMININE_EQUIPMENT",
     "RU_MACHINERY_PIECE_NOUNS",
     "RU_MACHINERY_PIECE_SLANG",
     "RU_PACKAGING",
@@ -141,6 +142,9 @@ EQUIPMENT_WORDS_V2: Final[dict[Language, dict[EquipmentTypeV2, tuple[str, ...]]]
         "flatbed": ("flatbed", "flatbed trailer"),
     },
 }
+RU_FEMININE_EQUIPMENT: Final = ("фура", "бортовая платформа", "площадка", "машина под контейнер",
+                                 "мега")  # fmt: skip
+"""Equipment words of feminine gender: «нужна фура», not «нужен фура» (card_v1 has none)."""
 EQUIPMENT_WORDS_SLANG_V2: Final[dict[EquipmentTypeV2, tuple[str, ...]]] = {
     "tent": ("тент", "фура"),
     "van": ("цельномет", "фургон"),

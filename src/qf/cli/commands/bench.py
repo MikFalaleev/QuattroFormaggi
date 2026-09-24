@@ -84,7 +84,8 @@ def configure_freeze(parser: argparse.ArgumentParser) -> None:
 
 def run_freeze(args: argparse.Namespace) -> int:
     root, cfg = _load(args)
-    manual, notes = load_manual_cases(args.manual) if args.manual else ([], [])
+    manual, notes = (load_manual_cases(args.manual, cfg.schema_version) if args.manual
+                     else ([], []))  # fmt: skip
     for note in notes:
         print(f"warning: {note}", file=sys.stderr)
     outcome = freeze(cfg, root=root, manual=manual, manual_source=args.manual,

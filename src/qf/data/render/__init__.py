@@ -10,6 +10,7 @@ from qf.data.render.base import (
     LayoutFamily,
     RenderError,
     Slot,
+    agree,
     assemble,
     fill_layout,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "LayoutFamily",
     "RenderError",
     "Slot",
+    "agree",
     "assemble",
     "build_fragments",
     "families_en",

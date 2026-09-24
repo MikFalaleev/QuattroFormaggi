@@ -20,7 +20,7 @@ from qf.contracts import SFTRecord
 from qf.data.conditions import LABELS_RU, describe_conditions
 from qf.domain import get_target_schema
 
-__all__ = ["curate", "render_review"]
+__all__ = ["curate", "gold_lines", "render_review"]
 
 _FIELDS_RU: Final = (
     ("shipper_name", "Отправитель"), ("cargo_category", "Категория"),
@@ -86,7 +86,8 @@ def _json(value: Any) -> Any:
     return value.model_dump(mode="json") if isinstance(value, BaseModel) else value
 
 
-def _gold(record: SFTRecord) -> list[str]:
+def gold_lines(record: SFTRecord) -> list[str]:
+    """The gold answer of the record in plain Russian, one line per card field."""
     schema = get_target_schema(record.schema_version)
     target = schema.parse(record.messages[2].content)
     card = target.card
@@ -123,5 +124,5 @@ def render_review(splits: Mapping[Any, Sequence[SFTRecord]], chosen: Sequence[SF
         hard = ", ".join(record.variant.hard_cases) or "без трудного случая"
         lines += ["", f"## {n}. {record.template_family}, {record.language} — {hard}", "",
                   f"`{record.id}`", "", "```text", record.messages[1].content, "```", "",
-                  *_gold(record)]  # fmt: skip
+                  *gold_lines(record)]  # fmt: skip
     return "\n".join(lines) + "\n"

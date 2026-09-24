@@ -29,6 +29,7 @@ from qf.contracts import (
 
 __all__ = [
     "BASE_REQUIRED_ORDER_V2",
+    "canonical_card_v2",
     "CONDITION_MISSING_NAMES",
     "REQUIRED_CONDITIONS",
     "check_target_consistency_v2",
@@ -135,3 +136,15 @@ def check_target_consistency_v2(target: ExtractionTargetV2) -> list[str]:
             if values is not None and values != sorted(values, key=order.index):
                 problems.append(f"{condition.kind}.{name} {values} are not in the order {order}")
     return problems
+
+
+def canonical_card_v2(card: ShipmentCardV2) -> ShipmentCardV2:
+    """The card with its conditions in `CONDITION_KINDS` order and the values of each list in
+    declaration order (a person may write them in any order; D-088 makes order a rule)."""
+    conditions = []
+    for condition in sorted(card.special_conditions,
+                            key=lambda c: CARD_V2_CONDITION_KINDS.index(c.kind)):  # fmt: skip
+        changes = {name: sorted(getattr(condition, name), key=order.index)
+                   for name, order in _LIST_ORDER.items() if hasattr(condition, name)}  # fmt: skip
+        conditions.append(condition.model_copy(update=changes))
+    return card.model_copy(update={"special_conditions": conditions})

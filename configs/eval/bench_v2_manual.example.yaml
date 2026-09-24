@@ -1,0 +1,106 @@
+# Пример ручных заявок для bench_v2 — карточка card_v2 (docs/EVAL_SPEC.md, docs/DATA_SPEC.md).
+# Скопируйте в configs/eval/bench_v2_manual.yaml, замените пример своими заявками и добавьте их
+# ДО заморозки: uv run qf bench freeze --config configs/eval/benchmark_v2.yaml --manual configs/eval/bench_v2_manual.yaml
+# Без персональных данных: вымышленные компании, без имён и телефонов.
+#
+# В карточке все 11 полей; чего нет в тексте — null. Количество мест не указано — null (не 1).
+# Недостающие поля и каноническую форму ответа посчитает код. Города — по-русски с регионом.
+#   equipment_type: tent (тент, фура) | van (цельнометаллический фургон) | reefer (рефрижератор) |
+#                   isotherm (изотерм) | container (контейнеровоз) | lowbed (трал) | mega (мега) |
+#                   flatbed (бортовая платформа)
+#   cargo_category: general | retail | consumer_goods | food_beverage | automotive | electronics |
+#                   machinery (спецтехника и оборудование)
+# special_conditions — особые условия, которые названы в тексте; условий нет — []. Порядок условий
+# и значений в списках любой: код расставит их сам.
+#   {kind: temperature, min_c: 2, max_c: 6}          «не выше +5» -> min_c: null, max_c: 5
+#   {kind: securing, methods: [straps, chains, wheel_chocks, anti_slip_mats, load_bars]}
+#   {kind: packaging, types: [crate, stretch_film, moisture_protection, shock_protection]}
+#   {kind: oversize, length: {value: 9.5, unit: m}, width: null, height: {value: 360, unit: cm}}
+#   {kind: sensors, parameters: [temperature, humidity, pressure, tilt, shock, door_opening]}
+# Условие названо без значений («нужна особая упаковка») — пустой список или null у значений.
+- author: example
+  language: ru
+  request_date: 2026-09-20
+  text: |
+    Добрый день! Нужен рефрижератор из Казани в Москву, 18 паллет, общий вес 12,5 т.
+    Держать +2…+6 °C, в машине нужен термописец. Загрузка 22.09.2026.
+    Груз — продукты питания, отправитель ООО «Северный склад».
+  card:
+    shipper_name: ООО «Северный склад»
+    cargo_category: food_beverage
+    equipment_type: reefer
+    pieces: 18
+    weight_total: {value: 12.5, unit: t}
+    weight_per_piece: null
+    origin: {city: Казань, region: Республика Татарстан}
+    destination: {city: Москва, region: Москва}
+    pickup_date: 2026-09-22
+    delivery_date: null
+    special_conditions:            # порядок любой: код поставит temperature перед sensors
+      - {kind: sensors, parameters: [temperature]}
+      - {kind: temperature, min_c: 2, max_c: 6}
+  conflicts: []
+- author: example
+  language: ru
+  request_date: 2026-09-20
+  text: |
+    Нужен трал: экскаватор, 1 единица техники, 21 т, из Екатеринбурга в Пермь.
+    Габариты: длина 9,5 м, ширина 3,2 м, высота 360 см. Крепить цепями и упорами.
+    Погрузка 25.09.2026.
+  card:
+    shipper_name: null
+    cargo_category: machinery
+    equipment_type: lowbed
+    pieces: 1
+    weight_total: {value: 21, unit: t}
+    weight_per_piece: null
+    origin: {city: Екатеринбург, region: Свердловская область}
+    destination: {city: Пермь, region: Пермский край}
+    pickup_date: 2026-09-25
+    delivery_date: null
+    special_conditions:
+      - {kind: securing, methods: [wheel_chocks, chains]}
+      - kind: oversize
+        length: {value: 9.5, unit: m}
+        width: {value: 3.2, unit: m}
+        height: {value: 360, unit: cm}
+  conflicts: []
+- author: example
+  language: ru
+  request_date: 2026-09-21
+  text: |
+    Коллеги, нужен цельнометаллический фургон из Самары в Уфу, 6 коробок, 800 кг,
+    электроника. Нужна особая упаковка. Загрузка завтра.
+  card:
+    shipper_name: null
+    cargo_category: electronics
+    equipment_type: van
+    pieces: 6
+    weight_total: {value: 800, unit: kg}
+    weight_per_piece: null
+    origin: {city: Самара, region: Самарская область}
+    destination: {city: Уфа, region: Республика Башкортостан}
+    pickup_date: 2026-09-22
+    delivery_date: null
+    special_conditions:
+      - {kind: packaging, types: []}    # названо без значений -> в недостающие
+  conflicts: []
+- author: example
+  language: en
+  request_date: 2026-09-20
+  text: |
+    Hi! Need a curtainsider from Moscow to Tula on September 23, 2026. 22 pallets, 12.6 t,
+    retail goods.
+  card:
+    shipper_name: null
+    cargo_category: retail
+    equipment_type: tent
+    pieces: 22
+    weight_total: {value: 12.6, unit: t}
+    weight_per_piece: null
+    origin: {city: Москва, region: Москва}
+    destination: {city: Тула, region: Тульская область}
+    pickup_date: 2026-09-23
+    delivery_date: null
+    special_conditions: []          # условий нет
+  conflicts: []

@@ -13,6 +13,10 @@ case goes through the same checks as a generated one. Format (a YAML list):
         shipper_name: ООО «Ромашка»
         ...all 11 card fields, null when the text does not say...
       conflicts: []             # optional: [{field: pieces, values: [18, 20]}]
+
+The card follows the schema of the benchmark (card_v1 or card_v2, sub-step V5). For card_v2 the
+special conditions and their lists may be written in any order: code puts them in the
+canonical one (D-088) before the answer is built.
 """
 
 from __future__ import annotations
@@ -29,19 +33,17 @@ from pydantic import Field, ValidationError
 from qf.common import DataValidationError, Issue, QFError, StrictConfig, format_validation_error
 from qf.contracts import (
     CARD_SCHEMA_VERSION,
-    Conflict,
-    ExtractionTarget,
     Message,
     SFTRecord,
-    ShipmentCard,
+    TargetSchemaVersion,
     VariantInfo,
 )
 from qf.domain import (
     CITIES,
     SHIPMENT_EXTRACTION,
+    TargetParseError,
     build_messages,
-    compute_missing_fields,
-    serialize_target,
+    get_target_schema,
 )
 
 __all__ = ["ManualCase", "load_manual_cases"]
@@ -56,7 +58,7 @@ class ManualCase(StrictConfig):
     conflicts: list[dict[str, Any]] = Field(default_factory=list)
 
 
-def _place_warnings(card: ShipmentCard, case_id: str) -> tuple[list[Issue], list[str]]:
+def _place_warnings(card: Any, case_id: str) -> tuple[list[Issue], list[str]]:
     """A catalog city must carry its catalog region; other cities are allowed with a warning."""
     errors, warnings = [], []
     for name in ("origin", "destination"):
@@ -72,14 +74,18 @@ def _place_warnings(card: ShipmentCard, case_id: str) -> tuple[list[Issue], list
     return errors, warnings
 
 
-def _record(case: ManualCase, n: int) -> tuple[SFTRecord, list[Issue], list[str]]:
+def _record(
+    case: ManualCase, n: int, schema_version: TargetSchemaVersion
+) -> tuple[SFTRecord, list[Issue], list[str]]:
     case_id = f"manual-{case.author}-{n}"
+    schema = get_target_schema(schema_version)
     # Through JSON: a date written as 2026-09-22 or '2026-09-22' is an ISO string there, while
     # "18" stays a string and is refused as a number (strict contracts, D-041).
-    card = ShipmentCard.model_validate_json(json.dumps(case.card, default=str))
-    conflicts = [Conflict.model_validate_json(json.dumps(c, default=str)) for c in case.conflicts]
-    target = ExtractionTarget(card=card, missing_fields=compute_missing_fields(card),
-                              conflicts=conflicts)  # fmt: skip
+    card = schema.canonicalize(schema.card_model.model_validate_json(
+        json.dumps(case.card, default=str)))  # fmt: skip
+    answer = {"card": card.model_dump(mode="json"), "missing_fields": schema.missing_fields(card),
+              "conflicts": case.conflicts}  # fmt: skip
+    target = schema.target_model.model_validate_json(json.dumps(answer, default=str))
     errors, warnings = _place_warnings(card, case_id)
     weight = card.weight_total or card.weight_per_piece
     mode: Literal["total", "per_piece", "none"] = "none"
@@ -95,16 +101,19 @@ def _record(case: ManualCase, n: int) -> tuple[SFTRecord, list[Issue], list[str]
         variant=VariantInfo(weight_unit=weight.unit if weight else None, weight_mode=mode,
                             dropped_fields=[], hard_cases=[], request_date=case.request_date,
                             date_style="text", city_lang=case.language, ood_reason=None),
-        schema_version=CARD_SCHEMA_VERSION, split="bench",
+        schema_version=schema_version, split="bench",
         messages=[*build_messages(case.text.strip(), case.request_date, case.language,
-                                  task.prompt_for(CARD_SCHEMA_VERSION)),
-                  Message(role="assistant", content=serialize_target(target))],
+                                  task.prompt_for(schema_version)),
+                  Message(role="assistant", content=schema.serialize(target))],
     )  # fmt: skip
     return record, errors, warnings
 
 
-def load_manual_cases(path: Path) -> tuple[list[SFTRecord], list[str]]:
-    """Records of the YAML file and warnings; every invalid case is reported at once."""
+def load_manual_cases(
+    path: Path, schema_version: TargetSchemaVersion = CARD_SCHEMA_VERSION
+) -> tuple[list[SFTRecord], list[str]]:
+    """Records of the YAML file in the given answer schema, and warnings; every invalid case is
+    reported at once."""
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
     except (OSError, yaml.YAMLError) as exc:
@@ -117,10 +126,13 @@ def load_manual_cases(path: Path) -> tuple[list[SFTRecord], list[str]]:
         try:
             case = ManualCase.model_validate(item)
             numbers[case.author] += 1
-            record, errors, notes = _record(case, numbers[case.author])
+            record, errors, notes = _record(case, numbers[case.author], schema_version)
         except ValidationError as exc:
             message = format_validation_error(exc)
             issues.append(Issue(f"{path.name}#{index}", "bench", "SCHEMA", message))
+            continue
+        except TargetParseError as exc:
+            issues.append(Issue(f"{path.name}#{index}", "bench", "SCHEMA", str(exc)))
             continue
         records.append(record)
         issues += errors

@@ -30,6 +30,7 @@ from qf.data import (
     render_review,
     sample_loads,
 )
+from qf.data.render import Fragment, agree
 from qf.domain import check_record, load_system_prompt
 from tests.conftest import REPO_ROOT
 from tests.generation import (
@@ -140,6 +141,21 @@ def test_v2_records_are_valid_card_v2() -> None:
     with_conditions = [r for r in all_records
                        if '"special_conditions":[]' not in r.messages[2].content]  # fmt: skip
     assert 0 < len(with_conditions) < len(all_records)
+
+
+def test_equipment_sentences_agree_with_the_word() -> None:
+    layout = (("Нужен {equipment}.", "ищу {equipment}", "{equipment} нужен"),
+              ("We require a {equipment}.",))  # fmt: skip
+
+    def word(text: str) -> dict[str, Fragment]:
+        return {"equipment": Fragment(text)}
+
+    assert agree(layout, word("фура"), "ru")[0] == (
+        "Нужна {equipment}.", "нужна {equipment}", "{equipment} нужна")  # fmt: skip
+    assert agree(layout, word("тент мега"), "ru") == layout  # «тент» is masculine
+    assert agree(layout, word("insulated van"), "en")[1] == ("We require an {equipment}.",)
+    assert agree(layout, word("dry van"), "en") == layout
+    assert agree(layout, {}, "ru") == layout  # the equipment is not in the text
 
 
 # --- determinism ---------------------------------------------------------------------------

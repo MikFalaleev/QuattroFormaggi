@@ -1,5 +1,6 @@
-"""Shared helpers of the generator tests: facts, configs and the invariants E1-E17 (plan 6.9;
-E16-E17 check the special conditions of card_v2, sub-step V3)."""
+"""Shared helpers of the generator tests: facts, configs and the invariants E1-E18 (plan 6.9;
+E16-E17 check the special conditions of card_v2, sub-step V3; E18 the grammar around the
+equipment word, found in the bench_v2 pre-review, sub-step V5)."""
 
 from __future__ import annotations
 
@@ -396,6 +397,23 @@ def e17_condition_values_in_evidence(
     return problems
 
 
+_FEMININE = (
+    "фура|бортовая платформа|площадка|машина под контейнер|мега"  # own list, not the generator's
+)
+_BAD_GRAMMAR = (
+    re.compile(rf"\b[Нн]ужен (?:{_FEMININE})(?![\w-])"),  # «нужен фура»
+    re.compile(rf"(?<![\w-])(?<!тент )(?:{_FEMININE})(?![\w-]) нужен\b"),  # «фура нужен»
+    re.compile(rf"\bищу (?:{_FEMININE})(?![\w-])"),  # «ищу фура» (accusative: «фуру»)
+    re.compile(r"\b[Aa] [AEIOaeio]\w"),  # "a insulated van"
+    re.compile(r"\b[Aa]n [b-df-hj-np-tv-z]", re.IGNORECASE),  # "an dry van"
+)
+
+
+def e18_equipment_grammar(g: GeneratedRecord, f: AnyLoadFacts, money: set[float]) -> list[str]:
+    text = g.record.messages[1].content
+    return [m.group(0) for pattern in _BAD_GRAMMAR for m in pattern.finditer(text)]
+
+
 INVARIANTS: dict[str, Invariant] = {
     "E1": e1_nonnull_fields_have_evidence,
     "E2": e2_fields_without_evidence_null,
@@ -412,6 +430,7 @@ INVARIANTS: dict[str, Invariant] = {
     "E15": e15_integers_without_decimal,
     "E16": e16_conditions_follow_facts_and_draft,
     "E17": e17_condition_values_in_evidence,
+    "E18": e18_equipment_grammar,
 }
 
 

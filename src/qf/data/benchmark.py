@@ -5,6 +5,10 @@ verified test and test_ood files (seeded, stratified); a human marks each candid
 drop in a CSV; `freeze` takes, per slice, the first ok records in the seeded priority order,
 adds hand-written cases, writes `<version>.jsonl` + `.sha256` once and forever, and writes
 test/test_ood without the benchmark records next to it. `generated_v1` is never changed.
+
+A benchmark has one answer schema (`schema_version`): bench_v1 is card_v1 from generated_v1
+into data/splits/, bench_v2 is card_v2 from generated_v2 into data/splits_v2/ (sub-step V5).
+A card_v2 slice may also require a special condition or an equipment type in the gold card.
 """
 
 from __future__ import annotations
@@ -32,9 +36,17 @@ from qf.common import (
     sha256_file,
     start_run,
 )
-from qf.contracts import SFTRecord, supported_versions
+from qf.contracts import (
+    CARD_SCHEMA_VERSION,
+    ConditionKind,
+    EquipmentTypeV2,
+    SFTRecord,
+    TargetSchemaVersion,
+    supported_versions,
+)
+from qf.data.review import gold_lines
 from qf.data.sft_io import DATASET_FILES, read_sft_records, write_sft_records
-from qf.domain import check_record, parse_target
+from qf.domain import check_record, get_target_schema, parse_target
 
 __all__ = [
     "BENCH_SCHEMAS",
@@ -54,8 +66,8 @@ __all__ = [
     "verify_benchmark",
 ]
 
-BENCH_SCHEMAS: Final = ("card_v1",)
-"""Answer schemas this stage selects, reviews and freezes; card_v2 is added in sub-step V5."""
+BENCH_SCHEMAS: Final = ("card_v1", "card_v2")
+"""Answer schemas this stage selects, reviews and freezes (card_v2 since sub-step V5)."""
 VERDICTS: Final = ("ok", "fix", "drop")
 CSV_COLUMNS: Final = ("n", "id", "slice", "role", "verdict", "comment")
 Stratum = Literal["template_family", "language", "ood_reason"]
@@ -68,6 +80,9 @@ class SliceConfig(StrictConfig):
     splits: list[Literal["test", "test_ood"]] = Field(min_length=1)
     kind: str  # "clean" or a hard case name
     stratify_by: list[Stratum] = Field(default_factory=list)
+    # card_v2 only: the gold card must hold this condition kind / equipment type
+    condition: ConditionKind | None = None
+    equipment: EquipmentTypeV2 | None = None
 
 
 class BenchmarkConfig(StrictConfig):
@@ -75,6 +90,7 @@ class BenchmarkConfig(StrictConfig):
 
     version: str = Field(pattern=r"^bench_v\d+$")
     seed: int
+    schema_version: TargetSchemaVersion = CARD_SCHEMA_VERSION  # of every record, manual ones too
     source_dir: Path
     out_dir: Path
     review_csv: Path
@@ -83,9 +99,14 @@ class BenchmarkConfig(StrictConfig):
     @model_validator(mode="after")
     def _disjoint_slices(self) -> BenchmarkConfig:
         names = [s.name for s in self.slices]
-        pairs = [(s.kind, split) for s in self.slices for split in s.splits]
-        if len(set(names)) != len(names) or len(set(pairs)) != len(pairs):
-            raise ValueError("slice names and (kind, split) pairs must be unique")
+        keys = [
+            (s.kind, split, s.condition, s.equipment) for s in self.slices for split in s.splits
+        ]
+        if len(set(names)) != len(names) or len(set(keys)) != len(keys):
+            raise ValueError("slice names and (kind, split, condition, equipment) must be unique")
+        filtered = [s.name for s in self.slices if s.condition or s.equipment]
+        if filtered and self.schema_version == CARD_SCHEMA_VERSION:
+            raise ValueError(f"condition / equipment filters need card_v2 slices: {filtered}")
         return self
 
     @property
@@ -126,6 +147,16 @@ def _systematic(
     return [ordered[min(len(ordered) - 1, int(offset + i * step))] for i in range(n)]
 
 
+def _matches(record: SFTRecord, spec: SliceConfig) -> bool:
+    """The slice's condition and equipment filters (none for card_v1 slices)."""
+    if spec.condition is None and spec.equipment is None:
+        return True
+    card = get_target_schema(record.schema_version).parse(record.messages[2].content).card
+    kinds = {condition.kind for condition in getattr(card, "special_conditions", [])}
+    return (spec.condition is None or spec.condition in kinds) and (
+        spec.equipment is None or card.equipment_type == spec.equipment)  # fmt: skip
+
+
 def select_candidates(
     datasets: Mapping[str, Sequence[SFTRecord]], cfg: BenchmarkConfig
 ) -> list[Candidate]:
@@ -137,7 +168,7 @@ def select_candidates(
     for spec in cfg.slices:
         pool = sorted(
             (r for split in spec.splits for r in datasets[split]
-             if _kind(r) == spec.kind and r.id not in used),
+             if _kind(r) == spec.kind and r.id not in used and _matches(r, spec)),
             key=lambda r: r.id,
         )  # fmt: skip
         if len(pool) < spec.count:
@@ -171,7 +202,7 @@ def _readable(value: Any) -> str:
     return str(value)
 
 
-def _gold_lines(record: SFTRecord) -> list[str]:
+def _gold_lines_v1(record: SFTRecord) -> list[str]:
     target = parse_target(record.messages[2].content).model_dump(mode="json")
     lines = [f"- {label}: {_readable(target['card'][key])}" for key, label in _LABELS]
     lines.append(f"- **Недостающие:** {', '.join(target['missing_fields']) or '—'}")
@@ -179,6 +210,10 @@ def _gold_lines(record: SFTRecord) -> list[str]:
                           for c in target["conflicts"])  # fmt: skip
     lines.append(f"- **Конфликты:** {conflicts or '—'}")
     return lines
+
+
+_GOLD_LINES: Final = {"card_v1": _gold_lines_v1, "card_v2": gold_lines}
+"""The gold shown to the reviewer, per answer schema (card_v1 keeps its step 8 lines)."""
 
 
 def render_review_markdown(candidates: Sequence[Candidate], version: str) -> str:
@@ -192,7 +227,8 @@ def render_review_markdown(candidates: Sequence[Candidate], version: str) -> str
         role = "резерв" if candidate.role == "reserve" else "основная"
         user = record.messages[1].content
         lines += [f"## {n}. {record.id} — {candidate.slice} ({role}, {record.template_family})",
-                  "", "```text", user, "```", "", *_gold_lines(record), ""]  # fmt: skip
+                  "", "```text", user, "```", "", *_GOLD_LINES[record.schema_version](record),
+                  ""]  # fmt: skip
     return "\n".join(lines)
 
 
@@ -275,20 +311,21 @@ def import_review(
 # --- stages --------------------------------------------------------------------------------
 
 
-def _read(path: Path, root: Path) -> tuple[ArtifactRef, list[SFTRecord]]:
+def _read(path: Path, root: Path, schema: str) -> tuple[ArtifactRef, list[SFTRecord]]:
+    """Verified records that all answer in the benchmark's schema."""
     ref = read_artifact(path, "sft_dataset", supported_versions("sft_dataset"), root=root)
     records, issues = read_sft_records(root / ref.path)
     if issues:
         raise DataValidationError(issues)
-    other = sorted({r.schema_version for r in records} - set(BENCH_SCHEMAS))
+    other = sorted({r.schema_version for r in records} - {schema})
     if other:
-        raise QFError(f"{ref.path}: records in {', '.join(other)} cannot be put in a benchmark "
-                      "yet; card_v2 benchmarks arrive in sub-step V5 (D-089)")  # fmt: skip
+        raise QFError(f"{ref.path}: records in {', '.join(other)} do not belong in a {schema} "
+                      "benchmark")  # fmt: skip
     return ref, records
 
 
-def _candidates_of(path: Path, root: Path) -> tuple[ArtifactRef, list[Candidate]]:
-    ref, records = _read(path, root)
+def _candidates_of(path: Path, root: Path, schema: str) -> tuple[ArtifactRef, list[Candidate]]:
+    ref, records = _read(path, root, schema)
     extra = load_artifact_manifest(root / ref.path, root=root).extra
     roles, slices = extra["roles"], extra["slices"]
     return ref, [Candidate(slices[r.id], roles[r.id], r) for r in records]
@@ -324,7 +361,8 @@ def export_review(cfg: BenchmarkConfig, *, root: Path) -> ExportOutcome:
     run = start_run("bench-export", root)
     refs, datasets = {}, {}
     for split in ("test", "test_ood"):
-        refs[split], datasets[split] = _read(root / cfg.source_dir / f"{split}.jsonl", root)
+        refs[split], datasets[split] = _read(root / cfg.source_dir / f"{split}.jsonl", root,
+                                             cfg.schema_version)  # fmt: skip
     candidates = select_candidates(datasets, cfg)
     work = root / cfg.work_dir
     ref = _write_candidates(candidates, work / "candidates.jsonl", run_id=run.run_id,
@@ -342,7 +380,8 @@ def export_review(cfg: BenchmarkConfig, *, root: Path) -> ExportOutcome:
 def import_review_stage(cfg: BenchmarkConfig, csv_path: Path, *, root: Path) -> ReviewResult:
     """Apply the verdicts of `csv_path`: `reviewed.jsonl` and `fix_list.md` in the work dir."""
     run = start_run("bench-review", root)
-    source, candidates = _candidates_of(root / cfg.work_dir / "candidates.jsonl", root)
+    source, candidates = _candidates_of(root / cfg.work_dir / "candidates.jsonl", root,
+                                        cfg.schema_version)  # fmt: skip
     result = import_review(candidates, read_verdicts(csv_path))
     ref = _write_candidates(
         result.kept, root / cfg.work_dir / "reviewed.jsonl", run_id=run.run_id,
@@ -394,7 +433,8 @@ def freeze(
     bench_path = root / cfg.bench_path
     if bench_path.exists():
         raise QFError(f"{cfg.bench_path} is already frozen; a new benchmark is bench_v2")
-    source, kept = _candidates_of(root / cfg.work_dir / "reviewed.jsonl", root)
+    source, kept = _candidates_of(root / cfg.work_dir / "reviewed.jsonl", root,
+                                  cfg.schema_version)  # fmt: skip
     unreviewed = sum(not c.record.reviewed for c in kept if c.role == "main")
     if unreviewed and not allow_unreviewed:
         raise QFError(f"{unreviewed} main candidate(s) have no verdict yet; finish the review "
@@ -408,6 +448,9 @@ def freeze(
         SFTRecord.model_validate({**c.record.model_dump(), "split": "bench"}) for c in chosen
     ]
     records += list(manual)
+    foreign = [r.id for r in manual if r.schema_version != cfg.schema_version]
+    if foreign:
+        raise QFError(f"manual cases {foreign[:3]} are not {cfg.schema_version}")
     issues = [issue for record in records for issue in check_record(record)]
     if issues:
         raise DataValidationError(issues)
@@ -435,7 +478,7 @@ def _write_frozen(
         path = root / cfg.source_dir / f"{name}.jsonl"
         if not path.exists():
             continue
-        ref, items = _read(path, root)
+        ref, items = _read(path, root, cfg.schema_version)
         kept = [r for r in items if r.id not in frozen]
         extra = load_artifact_manifest(root / ref.path, root=root).extra
         # An unchanged copy has the same sha256 as its source: it takes the source's parents,

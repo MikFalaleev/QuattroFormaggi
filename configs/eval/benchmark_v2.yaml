@@ -1,0 +1,38 @@
+# Sub-step V5: the frozen benchmark bench_v2 of card_v2 (docs/PLAN_card_v2.md, docs/EVAL_SPEC.md).
+# Candidates come from the verified test / test_ood files of generated_v2; each slice gets
+# `count` main candidates plus `reserve` spare ones (used only if a main one is dropped).
+# Slices take records in this order and never share one, so the rare slices come first.
+# Commands: uv run qf bench <export-review|import-review|freeze|verify> --config configs/eval/benchmark_v2.yaml
+version: bench_v2
+seed: 42
+schema_version: card_v2
+source_dir: data/processed/generated_v2   # never changed by the benchmark
+out_dir: data/splits_v2                   # bench_v2.jsonl + .sha256 and the splits without it
+review_csv: configs/eval/bench_v2_review.csv   # human verdicts, kept in Git
+slices:
+  # hard cases of the special conditions (card_v2)
+  - {name: oversize_partial, count: 8, reserve: 2, splits: [test, test_ood], kind: oversize_partial}
+  - {name: required_condition_dropped, count: 8, reserve: 2, splits: [test, test_ood], kind: required_condition_dropped}
+  - {name: condition_no_values, count: 8, reserve: 2, splits: [test, test_ood], kind: condition_no_values}
+  - {name: conditions_scattered, count: 8, reserve: 2, splits: [test, test_ood], kind: conditions_scattered}
+  # clean requests with a rare equipment type or a special condition
+  - {name: cond_oversize, count: 8, reserve: 2, splits: [test, test_ood], kind: clean, condition: oversize}
+  - {name: equip_isotherm, count: 8, reserve: 2, splits: [test, test_ood], kind: clean, equipment: isotherm}
+  - {name: equip_flatbed, count: 6, reserve: 2, splits: [test, test_ood], kind: clean, equipment: flatbed}
+  - {name: equip_mega, count: 8, reserve: 2, splits: [test, test_ood], kind: clean, equipment: mega, stratify_by: [language]}
+  - {name: equip_container, count: 8, reserve: 2, splits: [test, test_ood], kind: clean, equipment: container, stratify_by: [language]}
+  - {name: cond_temperature, count: 10, reserve: 2, splits: [test, test_ood], kind: clean, condition: temperature, stratify_by: [language]}
+  - {name: cond_sensors, count: 10, reserve: 2, splits: [test, test_ood], kind: clean, condition: sensors, stratify_by: [language]}
+  - {name: cond_securing, count: 10, reserve: 2, splits: [test, test_ood], kind: clean, condition: securing, stratify_by: [language]}
+  - {name: cond_packaging, count: 10, reserve: 2, splits: [test, test_ood], kind: clean, condition: packaging, stratify_by: [language]}
+  # hard cases of card_v1, kept in card_v2
+  - {name: per_piece_weight, count: 8, reserve: 2, splits: [test, test_ood], kind: per_piece_weight}
+  - {name: conflict_weight, count: 8, reserve: 2, splits: [test, test_ood], kind: conflict_weight}
+  - {name: conflict_pieces, count: 8, reserve: 2, splits: [test, test_ood], kind: conflict_pieces}
+  - {name: relative_date, count: 8, reserve: 2, splits: [test, test_ood], kind: relative_date}
+  - {name: distractor_numbers, count: 8, reserve: 2, splits: [test, test_ood], kind: distractor_numbers}
+  - {name: city_lang_switch, count: 8, reserve: 2, splits: [test, test_ood], kind: city_lang_switch}
+  # the rest: clean requests in and out of distribution, dropped fields
+  - {name: clean_id, count: 30, splits: [test], kind: clean, stratify_by: [template_family, language]}
+  - {name: clean_ood, count: 20, splits: [test_ood], kind: clean, stratify_by: [ood_reason]}
+  - {name: missing_fields, count: 30, splits: [test, test_ood], kind: dropped_fields, stratify_by: [language]}
