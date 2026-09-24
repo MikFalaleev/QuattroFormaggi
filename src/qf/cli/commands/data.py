@@ -21,7 +21,9 @@ from qf.contracts import supported_versions
 from qf.data import (
     DATASET_FILES,
     FACTS_BUILDERS,
+    FACTS_V2_REPORT_FILENAME,
     LOAD_FACTS_FILENAME,
+    LOAD_FACTS_V2_FILENAME,
     RAW_SOURCES,
     SPLIT_FILES,
     SPLITTERS,
@@ -31,6 +33,7 @@ from qf.data import (
     SourceFileConfig,
     SplitFileConfig,
     build_facts_artifact,
+    build_facts_v2_artifact,
     build_length_report,
     fetch_raw_dataset,
     generate_dataset,
@@ -45,6 +48,7 @@ from qf.data import (
 )
 
 __all__ = [
+    "DEFAULT_CONDITIONS_TABLE",
     "DEFAULT_EXPECTATIONS",
     "DEFAULT_FACTS_CONFIG",
     "DEFAULT_DATA_DIR",
@@ -53,6 +57,7 @@ __all__ = [
     "DEFAULT_SOURCE_CONFIG",
     "configure_build",
     "configure_facts",
+    "configure_facts_v2",
     "configure_fetch",
     "configure_profile",
     "configure_report",
@@ -60,6 +65,7 @@ __all__ = [
     "configure_validate",
     "run_build",
     "run_facts",
+    "run_facts_v2",
     "run_fetch",
     "run_profile",
     "run_report",
@@ -70,6 +76,7 @@ __all__ = [
 DEFAULT_SOURCE_CONFIG = CONFIGS / "data" / "source.yaml"
 DEFAULT_EXPECTATIONS = CONFIGS / "data" / "expectations.yaml"
 DEFAULT_FACTS_CONFIG = CONFIGS / "data" / "facts.yaml"
+DEFAULT_CONDITIONS_TABLE = CONFIGS / "data" / "equipment_conditions_v1.yaml"
 DEFAULT_GENERATE_CONFIG = CONFIGS / "data" / "generate_v1.yaml"
 DEFAULT_SPLIT_CONFIG = CONFIGS / "data" / "split.yaml"
 DEFAULT_DATA_DIR = DATA_PROCESSED / "generated_v1"
@@ -186,6 +193,32 @@ def _build_facts(root: Path, facts_config: Path | None, source_config: Path | No
 
 def run_facts(args: argparse.Namespace) -> int:
     _build_facts(project_root(), args.config, args.source_config)
+    return 0
+
+
+def configure_facts_v2(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--table",
+        type=Path,
+        default=None,
+        help=f"equipment and conditions table (default: <project>/{DEFAULT_CONDITIONS_TABLE})",
+    )
+
+
+def run_facts_v2(args: argparse.Namespace) -> int:
+    """Sub-step V2: load facts v1 + the table -> load facts v2 and a report to review."""
+    root = project_root()
+    result = build_facts_v2_artifact(
+        root / DATA_PROCESSED / LOAD_FACTS_FILENAME,
+        args.table or root / DEFAULT_CONDITIONS_TABLE,
+        root=root,
+        out_path=root / DATA_PROCESSED / LOAD_FACTS_V2_FILENAME,
+        report_path=root / DATA_PROCESSED / FACTS_V2_REPORT_FILENAME,
+    )
+    print(f"Built {result.count} load facts v2: {result.ref.path} "
+          f"(sha256 {result.ref.sha256[:12]})")  # fmt: skip
+    print(f"Review: {result.report_path}")
+    print(f"Run manifest: {result.run_dir}")
     return 0
 
 

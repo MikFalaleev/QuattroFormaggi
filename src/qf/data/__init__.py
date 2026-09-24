@@ -21,6 +21,22 @@ from qf.data.benchmark import (
     verify_benchmark,
 )
 from qf.data.city_map import CityMap, load_city_map
+from qf.data.conditions import (
+    CONDITIONS_REPORT_VERSION,
+    FACTS_V2_REPORT_FILENAME,
+    LABELS_RU,
+    LOAD_FACTS_V2_FILENAME,
+    ConditionsTable,
+    FactsV2Result,
+    Profile,
+    assign_conditions,
+    build_facts_v2,
+    build_facts_v2_artifact,
+    completeness_problems,
+    conditions_report,
+    load_conditions_table,
+    render_conditions_report,
+)
 from qf.data.facts import (
     CARGO_CATEGORIES,
     EQUIPMENT_TYPES,
@@ -112,6 +128,20 @@ from qf.data.validate import (
 )
 
 __all__ = [
+    "CONDITIONS_REPORT_VERSION",
+    "FACTS_V2_REPORT_FILENAME",
+    "LABELS_RU",
+    "LOAD_FACTS_V2_FILENAME",
+    "ConditionsTable",
+    "FactsV2Result",
+    "Profile",
+    "assign_conditions",
+    "build_facts_v2",
+    "build_facts_v2_artifact",
+    "completeness_problems",
+    "conditions_report",
+    "load_conditions_table",
+    "render_conditions_report",
     "load_manual_cases",
     "ManualCase",
     "verify_benchmark",

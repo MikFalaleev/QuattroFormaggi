@@ -27,7 +27,7 @@ from qf.common import (
     start_run,
     write_artifact,
 )
-from qf.contracts import SFTRecord, supported_versions
+from qf.contracts import LOAD_FACTS_SCHEMA_VERSION, SFTRecord, supported_versions
 from qf.data.facts import load_facts
 from qf.data.registries import TEMPLATE_FAMILIES
 from qf.data.sft_io import SPLIT_FILES, read_sft_records
@@ -163,8 +163,8 @@ def _routes_by_load(ref: ArtifactRef, root: Path) -> dict[str, str]:
     parents = [a for a in lineage(ref, root=root) if a.kind == "load_facts"]
     if not parents:
         raise QFError(f"{ref.path}: no load_facts artifact among its ancestors")
-    facts_ref = read_artifact(root / parents[0].path, "load_facts",
-                              supported_versions("load_facts"), root=root)  # fmt: skip
+    facts_ref = read_artifact(root / parents[0].path, "load_facts", {LOAD_FACTS_SCHEMA_VERSION},
+                              root=root)  # fmt: skip
     return {fact.load_id: fact.route_id for fact in load_facts(facts_ref, root)}
 
 

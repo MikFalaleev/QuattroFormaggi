@@ -1,0 +1,82 @@
+# Таблица «груз → транспорт → особые условия» для карточки card_v2 (подшаг V2, D-083).
+#
+# В исходном датасете тип транспорта не связан с грузом, а особых условий нет вовсе. Поэтому
+# каждой загрузке назначается ПРОФИЛЬ по её категории груза из датасета: тип транспорта, особые
+# условия, а для спецтехники — категория machinery и число мест. Выбор детерминированный: зависит
+# от номера загрузки, версии таблицы и seed. Доли (share) в каждой категории дают в сумме 1.
+# Новая таблица — новый файл (equipment_conditions_v2.yaml); этот после проверки не меняется.
+#
+# Типы транспорта:  tent — тент (фура), van — цельнометаллический фургон, reefer — рефрижератор,
+#   isotherm — изотерм, container — контейнеровоз, lowbed — трал, mega — мега (тент с пониженным
+#   полом для высоких и объёмных грузов), flatbed — бортовая платформа.
+# Крепление (securing):  straps — ремни, chains — цепи, wheel_chocks — противооткатные упоры,
+#   anti_slip_mats — антискользящие коврики, load_bars — распорные штанги.
+# Упаковка (packaging):  crate — обрешётка/ящик, stretch_film — стрейч-плёнка,
+#   moisture_protection — влагозащитная, shock_protection — амортизирующая.
+# Датчики (sensors):  temperature — температура, humidity — влажность, pressure — давление,
+#   tilt — наклон/горизонталь, shock — удары, door_opening — открытие дверей.
+version: equipment_conditions_v1
+seed: 20260923
+
+# Температурные режимы, °C. null — граница не задана («не выше −18»: min_c null, max_c −18).
+temperature_ranges:
+  chilled: {min_c: 2, max_c: 6}          # охлаждённые продукты: +2…+6
+  frozen: {min_c: -20, max_c: -18}       # заморозка: −20…−18
+  frozen_max: {min_c: null, max_c: -18}  # «не выше −18»
+  frozen_exact: {min_c: -18, max_c: -18} # «−18»
+  cool_max: {min_c: null, max_c: 5}      # «не выше +5»
+  warm: {min_c: 15, max_c: 25}           # «+15…+25» (зимой, чтобы не замёрзло)
+
+# Габариты негабаритных грузов, метры: [от, до]; значение берётся с шагом 0,1 м.
+# null — этот габарит в заявке не указывается. Тралу нужны все три габарита.
+oversize_ranges:
+  machinery: {length: [6.0, 12.0], width: [2.6, 3.5], height: [2.8, 4.5]}  # спецтехника на трале
+  long: {length: [13.7, 16.0], width: null, height: null}                   # длинномер на платформе
+
+# Профили по категории груза из датасета. cargo_category — если категория в карточке другая;
+# pieces — [от, до], если число мест из датасета не подходит (спецтехника — 1–2 единицы).
+categories:
+  food_beverage:    # продукты и напитки
+    - {name: reefer_chilled, share: 0.30, equipment: reefer, temperature: chilled}
+    - {name: reefer_chilled_logger, share: 0.10, equipment: reefer, temperature: chilled, sensors: [temperature]}
+    - {name: reefer_frozen, share: 0.12, equipment: reefer, temperature: frozen}
+    - {name: reefer_frozen_max, share: 0.05, equipment: reefer, temperature: frozen_max}
+    - {name: reefer_minus18, share: 0.03, equipment: reefer, temperature: frozen_exact}
+    - {name: isotherm_cool, share: 0.10, equipment: isotherm, temperature: cool_max}
+    - {name: isotherm, share: 0.05, equipment: isotherm}
+    - {name: tent, share: 0.25, equipment: tent}
+  electronics:      # электроника
+    - {name: van, share: 0.35, equipment: van}
+    - {name: van_shock, share: 0.20, equipment: van, packaging: [shock_protection], sensors: [shock]}
+    - {name: van_climate, share: 0.08, equipment: van, packaging: [moisture_protection], sensors: [humidity, shock]}
+    - {name: van_secure, share: 0.05, equipment: van, sensors: [door_opening]}
+    - {name: van_sensitive, share: 0.05, equipment: van, packaging: [shock_protection], sensors: [pressure, tilt]}
+    - {name: container, share: 0.12, equipment: container, packaging: [moisture_protection]}
+    - {name: mega, share: 0.15, equipment: mega}
+  automotive:       # автозапчасти
+    - {name: tent, share: 0.40, equipment: tent}
+    - {name: tent_straps, share: 0.15, equipment: tent, securing: [straps]}
+    - {name: container, share: 0.20, equipment: container}
+    - {name: flatbed, share: 0.15, equipment: flatbed, securing: [straps, anti_slip_mats], packaging: [crate]}
+    - {name: van, share: 0.10, equipment: van}
+  general:          # генеральные грузы; часть становится спецтехникой
+    - {name: tent, share: 0.30, equipment: tent}
+    - {name: tent_straps, share: 0.10, equipment: tent, securing: [straps]}
+    - {name: container, share: 0.10, equipment: container}
+    - {name: machinery_lowbed, share: 0.30, cargo_category: machinery, equipment: lowbed, pieces: [1, 2], oversize: machinery, securing: [chains, wheel_chocks]}
+    - {name: machinery_lowbed_tilt, share: 0.05, cargo_category: machinery, equipment: lowbed, pieces: [1, 2], oversize: machinery, securing: [chains, wheel_chocks], sensors: [tilt]}
+    - {name: machinery_flatbed, share: 0.07, cargo_category: machinery, equipment: flatbed, pieces: [1, 3], securing: [chains, wheel_chocks], packaging: [crate]}
+    - {name: flatbed_long, share: 0.08, equipment: flatbed, oversize: long, securing: [straps, chains]}
+  retail:           # розница
+    - {name: tent, share: 0.40, equipment: tent}
+    - {name: tent_bars, share: 0.10, equipment: tent, securing: [load_bars]}
+    - {name: mega, share: 0.25, equipment: mega}
+    - {name: van_film, share: 0.10, equipment: van, packaging: [stretch_film]}
+    - {name: container, share: 0.15, equipment: container}
+  consumer_goods:   # товары народного потребления
+    - {name: tent, share: 0.35, equipment: tent}
+    - {name: tent_bars, share: 0.05, equipment: tent, securing: [load_bars]}
+    - {name: mega, share: 0.20, equipment: mega}
+    - {name: van_film, share: 0.15, equipment: van, packaging: [stretch_film]}
+    - {name: isotherm_warm, share: 0.10, equipment: isotherm, temperature: warm}
+    - {name: container, share: 0.15, equipment: container}

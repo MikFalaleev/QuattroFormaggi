@@ -41,6 +41,7 @@ from qf.contracts.card_v2 import MissingField as MissingFieldV2
 from qf.contracts.card_v2 import ShipmentCard as ShipmentCardV2
 from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
+from qf.contracts.facts_v2 import LOAD_FACTS_V2_SCHEMA_VERSION, LoadFactsV2
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
 from qf.contracts.ports import (
     FactsBuilder,
@@ -101,6 +102,7 @@ __all__ = [
     "SpecialCondition",
     "TemperatureCondition",
     "LOAD_FACTS_SCHEMA_VERSION",
+    "LOAD_FACTS_V2_SCHEMA_VERSION",
     "RECORD_ROLES",
     "SFT_RECORD_SCHEMA_VERSION",
     "SUPPORTED_SCHEMA_VERSIONS",
@@ -115,6 +117,7 @@ __all__ = [
     "HardCaseName",
     "Language",
     "LoadFacts",
+    "LoadFactsV2",
     "Message",
     "Place",
     "Quantity",

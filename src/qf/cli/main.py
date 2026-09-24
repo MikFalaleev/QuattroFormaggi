@@ -59,6 +59,13 @@ _SPECS = (
         data.configure_facts,
     ),
     CommandSpec(
+        "data facts-v2",
+        "V2",
+        "assign equipment types and special conditions (card_v2 facts)",
+        data.run_facts_v2,
+        data.configure_facts_v2,
+    ),
+    CommandSpec(
         "data build",
         "6",
         "build load facts and generate SFT records",

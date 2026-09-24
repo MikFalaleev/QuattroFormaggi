@@ -27,6 +27,7 @@ from qf.common import (
     start_run,
 )
 from qf.contracts import (
+    LOAD_FACTS_SCHEMA_VERSION,
     HardCase,
     Language,
     LoadFacts,
@@ -36,7 +37,6 @@ from qf.contracts import (
     RequestDraft,
     SFTRecord,
     TemplateFamily,
-    supported_versions,
 )
 from qf.data.facts import load_facts
 from qf.data.registries import HARD_CASES, TEMPLATE_FAMILIES
@@ -404,7 +404,7 @@ def generate_dataset(
     """The generate stage: `load_facts` artifact -> one `sft_dataset@sft_record_v1` artifact per
     split plus `smoke.jsonl` (the first train records by id) and a run manifest."""
     run = start_run(_RUN_KIND, root)
-    facts_ref = read_artifact(facts_path, "load_facts", supported_versions("load_facts"),
+    facts_ref = read_artifact(facts_path, "load_facts", {LOAD_FACTS_SCHEMA_VERSION},
                               root=root)  # fmt: skip
     records, plan = generate_records(load_facts(facts_ref, root), cfg, source_prefix=source_prefix)
     shared = {"holdout_routes": plan.holdout_routes,

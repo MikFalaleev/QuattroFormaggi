@@ -18,6 +18,7 @@ PLANNED_COMMANDS = {
     "data fetch",
     "data profile",
     "data facts",
+    "data facts-v2",
     "data build",
     "data split",
     "validate-data",
