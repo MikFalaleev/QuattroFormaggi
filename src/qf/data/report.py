@@ -24,7 +24,7 @@ from qf.common import (
 )
 from qf.contracts import SFTRecord, supported_versions
 from qf.data.sft_io import read_sft_records
-from qf.domain import parse_target
+from qf.domain import get_target_schema
 
 __all__ = [
     "LENGTH_REPORT_VERSION",
@@ -55,14 +55,22 @@ def _composition(records: Sequence[SFTRecord]) -> dict[str, dict[str, int]]:
     def count(values: Sequence[str]) -> dict[str, int]:
         return dict(sorted(Counter(values).items()))
 
-    targets = [parse_target(record.messages[2].content) for record in records]
-    return {
+    targets = [get_target_schema(record.schema_version).parse(record.messages[2].content)
+               for record in records]  # fmt: skip
+    composition = {
         "family": count([r.template_family for r in records]),
         "language": count([r.language for r in records]),
         "hard_case": count([",".join(r.variant.hard_cases) or "clean" for r in records]),
         "equipment_type": count([str(t.card.equipment_type) for t in targets]),
         "missing_fields": count([name for t in targets for name in t.missing_fields]),
     }
+    conditions = [getattr(t.card, "special_conditions", None) for t in targets]
+    if any(c is not None for c in conditions):  # card_v2: which conditions the answers hold
+        composition["special_conditions"] = count(
+            [c.kind for items in conditions for c in items or []]
+            + ["none" for items in conditions if not items]
+        )
+    return composition
 
 
 def length_report(

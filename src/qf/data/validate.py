@@ -27,8 +27,8 @@ from qf.common import (
     start_run,
     write_artifact,
 )
-from qf.contracts import LOAD_FACTS_SCHEMA_VERSION, SFTRecord, supported_versions
-from qf.data.facts import load_facts
+from qf.contracts import SFTRecord, supported_versions
+from qf.data.facts import FACTS_MODELS, load_facts
 from qf.data.registries import TEMPLATE_FAMILIES
 from qf.data.sft_io import SPLIT_FILES, read_sft_records
 from qf.data.split import split_issues
@@ -159,13 +159,15 @@ def _holdouts(extras: Mapping[str, Mapping[str, Any]]) -> tuple[set[str], set[st
 
 
 def _routes_by_load(ref: ArtifactRef, root: Path) -> dict[str, str]:
-    """load_id -> route_id from the load_facts artifact this split was generated from."""
+    """load_id -> route_id from the load_facts artifact this split was generated from: the
+    nearest one among its ancestors, of any version (card_v2 data comes from load_facts_v2,
+    which itself comes from load_facts_v1)."""
     parents = [a for a in lineage(ref, root=root) if a.kind == "load_facts"]
     if not parents:
         raise QFError(f"{ref.path}: no load_facts artifact among its ancestors")
-    facts_ref = read_artifact(root / parents[0].path, "load_facts", {LOAD_FACTS_SCHEMA_VERSION},
-                              root=root)  # fmt: skip
-    return {fact.load_id: fact.route_id for fact in load_facts(facts_ref, root)}
+    facts_ref = read_artifact(root / parents[0].path, "load_facts", set(FACTS_MODELS), root=root)
+    facts = load_facts(facts_ref, root, model=FACTS_MODELS[facts_ref.schema_version])
+    return {fact.load_id: fact.route_id for fact in facts}
 
 
 def _ood_issues(

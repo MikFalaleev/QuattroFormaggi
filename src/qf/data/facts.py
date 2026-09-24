@@ -32,10 +32,12 @@ from qf.common import (
 )
 from qf.contracts import (
     LOAD_FACTS_SCHEMA_VERSION,
+    LOAD_FACTS_V2_SCHEMA_VERSION,
     CargoCategory,
     EquipmentType,
     FactsBuilder,
     LoadFacts,
+    LoadFactsV2,
     Place,
     supported_versions,
 )
@@ -47,6 +49,7 @@ from qf.data.registries import FACTS_BUILDERS
 __all__ = [
     "CARGO_CATEGORIES",
     "EQUIPMENT_TYPES",
+    "FACTS_MODELS",
     "LOAD_FACTS_FILENAME",
     "FactsFileConfig",
     "FactsResult",
@@ -58,6 +61,10 @@ __all__ = [
 ]
 
 LOAD_FACTS_FILENAME: Final = "load_facts.jsonl"
+FACTS_MODELS: Final[Mapping[str, type[BaseModel]]] = MappingProxyType(
+    {LOAD_FACTS_SCHEMA_VERSION: LoadFacts, LOAD_FACTS_V2_SCHEMA_VERSION: LoadFactsV2}
+)
+"""The model of each `load_facts` version (both carry load_id and route_id)."""
 EQUIPMENT_TYPES: Final[Mapping[str, EquipmentType]] = MappingProxyType(
     {"Dry Van": "dry_van", "Refrigerated": "reefer"}
 )
