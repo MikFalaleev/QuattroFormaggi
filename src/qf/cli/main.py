@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qf import __version__
-from qf.cli.commands import bench, data, doctor, tokens, ui
+from qf.cli.commands import bench, data, doctor, tokens, train, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -157,8 +157,27 @@ _SPECS = (
         tokens.run_audit,
         tokens.configure_audit,
     ),
-    CommandSpec("train estimate", "12", "estimate steps, time and cost of training"),
-    CommandSpec("train run", "12", "run QLoRA adapter training"),
+    CommandSpec(
+        "train estimate",
+        "12",
+        "estimate steps, tokens, time, cost and memory of training",
+        train.run_estimate,
+        train.configure_estimate,
+    ),
+    CommandSpec(
+        "train run",
+        "12",
+        "run QLoRA adapter training (or --resume a stopped run)",
+        train.run_run,
+        train.configure_run,
+    ),
+    CommandSpec(
+        "train fetch-base",
+        "12",
+        "download the pinned base model weights (~24.5 GB; GPU machine, after approval)",
+        train.run_fetch_base,
+        train.configure_fetch_base,
+    ),
     CommandSpec("export verify", "15", "verify adapter/merged artifacts against manifests"),
     CommandSpec("export merge", "16", "merge the adapter into full HF weights"),
     CommandSpec("export gguf", "17", "convert to GGUF and quantize"),

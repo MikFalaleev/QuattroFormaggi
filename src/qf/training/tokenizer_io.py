@@ -40,6 +40,9 @@ class BaseModelConfig(StrictConfig):
     # transformers 5 warns that the pre-tokenizer regex of this tokenizer.json differs from the
     # official Mistral tokenizer; on our data both give the same ids (D-113), the fix is kept on
     fix_mistral_regex: bool = True
+    # the HF-format weight shards and their index (`qf train fetch-base`, plan step 13; the
+    # Mistral-format consolidated.safetensors of the same size is never fetched, D-115)
+    weight_files: list[str] = Field(default_factory=list)
 
     def directory(self, root: Path) -> Path:
         return root / self.local_dir

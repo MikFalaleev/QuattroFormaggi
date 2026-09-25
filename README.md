@@ -61,7 +61,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf ui [--port 8765]` | — | реализована: локальный веб-интерфейс для ручной проверки — заявки и эталоны, оценка ответа, генератор, отчёты прогонов (D-107) |
 | `qf eval-baseline --config PATH --json-schema on\|off [--resume RUN_DIR]` | 10 | реализована: baseline модели в LM Studio в одном из двух режимов (backend `openai_local`); нижняя граница — `qf eval run` с `configs/eval/baseline_{empty,rules}_v2.yaml` |
 | `qf tokens fetch [--config PATH]`, `qf tokens audit [--data DIR] [--max-len 2048]` | 11 | реализованы: файлы токенизатора закреплённой ревизии без весов; аудит маски обучения → `runs/<id>/mask_audit.md` (D-113) |
-| `qf train estimate`, `qf train run` | 12 | не реализованы |
+| `qf train estimate [--tps N] [--rate R]`, `qf train run [--config PATH] [--max-steps N] [--save-every N] [--eval-every N]`, `qf train run --resume runs/<id>/checkpoint-N`, `qf train fetch-base` | 12 | реализованы: оценка шагов, токенов, памяти и стоимости → `runs/<id>/estimate.md`; обучение QLoRA с контрольными точками и продолжением; веса базы (~24,5 ГБ) — только на GPU-машине после одобрения (D-114…D-117). Репетиция на CPU: `qf train run --config configs/train/tiny_cpu_test.yaml` |
 | `qf export verify` | 15 | не реализована |
 | `qf export merge` | 16 | не реализована |
 | `qf export gguf` | 17 | не реализована |

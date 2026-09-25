@@ -11,3 +11,13 @@ tokenizer_files:
   - config.json
   - generation_config.json
 local_dir: artifacts/base_model/mistralai--Mistral-Nemo-Instruct-2407/04d8a90549d23fc6bd7f642064003592df51e9b3
+# Step 13 (⛔ STOP, ~24.5 GB, on the GPU machine): `uv run qf train fetch-base`.
+# Only the HF-format shards and their index; the repository's consolidated.safetensors (the
+# same weights in Mistral format, another 24.5 GB) is not fetched (D-115).
+weight_files:
+  - model.safetensors.index.json
+  - model-00001-of-00005.safetensors
+  - model-00002-of-00005.safetensors
+  - model-00003-of-00005.safetensors
+  - model-00004-of-00005.safetensors
+  - model-00005-of-00005.safetensors

@@ -1,0 +1,41 @@
+# Step 12: a rehearsal of the whole `qf train run` path on the Mac CPU — the real tokenizer,
+# data hashes, features, manifest and adapter artifact — with a RANDOMLY INITIALISED 2-layer
+# Mistral instead of the base model. Its adapter is not a model and is never merged or evaluated.
+#   uv run qf train run --config configs/train/tiny_cpu_test.yaml
+run_name: tiny-cpu-rehearsal
+seed: 42
+model:
+  id: mistralai/Mistral-Nemo-Instruct-2407
+  revision: 04d8a90549d23fc6bd7f642064003592df51e9b3
+  base_model_config: configs/train/base_model.yaml   # only its tokenizer files are used
+quantization:
+  load_in_4bit: false        # the tiny loader never quantizes
+  compute_dtype: bf16        # ignored on CPU: the tiny loader trains in fp32
+lora:
+  rank: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+data:
+  train_path: data/processed/generated_v2/smoke.jsonl   # 50 records (a subset of train)
+  val_path: data/processed/generated_v2/val.jsonl
+  expected_sha256:
+    train: f1e6357477e7302535ebca8ee98a0be321475b118a40e4d651015056dc1afa5b
+    val: 731a1c5badc242f753f4b819dba8046f53acd05740f457206eb79c5da3c71916
+training:
+  max_sequence_length: 2048
+  micro_batch_size: 1
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-3
+  epochs: 1
+  max_steps: 4
+  max_wall_time_minutes: 30
+  warmup_ratio: 0.0
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  checkpoint_every_optimizer_steps: 2
+  evaluate_every_optimizer_steps: 100      # only the final evaluation (150 val records)
+  keep_checkpoints: 2
+trainer:
+  name: hf_trainer_qlora
+  loader: tiny_random_cpu

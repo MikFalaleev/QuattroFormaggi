@@ -35,6 +35,7 @@ PLANNED_COMMANDS = {
     "tokens audit",
     "train estimate",
     "train run",
+    "train fetch-base",
     "export merge",
     "export gguf",
     "export verify",
@@ -75,7 +76,7 @@ def test_unimplemented_command_exits_2(name: str, capsys: pytest.CaptureFixture[
     assert f"Stage {COMMANDS[name].stage} " in err
 
 
-@pytest.mark.parametrize("name", ["train run", "export gguf", "lab"])
+@pytest.mark.parametrize("name", ["export merge", "export gguf", "lab"])
 def test_unimplemented_command_with_arguments_still_exits_2(
     name: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -130,10 +131,11 @@ def test_string_system_exit_maps_to_1(
 
 def test_module_entry_point() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "qf", "train", "run"], capture_output=True, text=True, check=False
-    )
+        [sys.executable, "-m", "qf", "export", "merge"], capture_output=True, text=True,
+        check=False,
+    )  # fmt: skip
     assert result.returncode == 2
-    assert "Stage 12 is not implemented yet" in result.stderr
+    assert "Stage 16 is not implemented yet" in result.stderr
 
 
 def test_system_exit_without_code_maps_to_0(monkeypatch: pytest.MonkeyPatch) -> None:

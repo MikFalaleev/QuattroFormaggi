@@ -19,8 +19,12 @@ import qf.data  # noqa: F401  (imported for its registries: RAW_SOURCES)
 import qf.domain  # noqa: F401  (imported for its registries: TASKS)
 import qf.eval  # noqa: F401  (imported for its registries: METRICS)
 from qf.common import ComponentConfig, QFError, Registry
+from qf.training import TRAINERS
 
 __all__ = ["build"]
+
+TRAINERS.register_lazy("hf_trainer_qlora", "qf.training.trainers.hf_qlora:HFQLoRATrainer",
+                       extra="train-cuda")  # fmt: skip
 
 
 def build(registry: Registry[Any], selector: ComponentConfig) -> Any:

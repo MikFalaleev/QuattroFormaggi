@@ -43,7 +43,9 @@ from qf.contracts.evaluation import CaseScore, CaseScoreV2, MetricValue
 from qf.contracts.facts import LOAD_FACTS_SCHEMA_VERSION, LoadFacts
 from qf.contracts.facts_v2 import LOAD_FACTS_V2_SCHEMA_VERSION, AnyLoadFacts, LoadFactsV2
 from qf.contracts.generation import GenerationRequest, GenerationResult, Message, Role
+from qf.contracts.models import ModelRef
 from qf.contracts.ports import (
+    AdapterTrainer,
     FactsBuilder,
     GenerationBackend,
     HardCase,
@@ -71,9 +73,41 @@ from qf.contracts.rendering import (
     RenderedRequest,
     RequestDraft,
 )
+from qf.contracts.training import (
+    PLACEHOLDER_REVISION,
+    DataHashes,
+    Estimate,
+    MemoryEstimate,
+    TokenStats,
+    TrainBudget,
+    TrainConfig,
+    TrainData,
+    TrainLogging,
+    TrainLora,
+    TrainModel,
+    TrainOutput,
+    TrainQuantization,
+    TrainSettings,
+)
 from qf.contracts.versions import SUPPORTED_SCHEMA_VERSIONS, require_supported, supported_versions
 
 __all__ = [
+    "PLACEHOLDER_REVISION",
+    "AdapterTrainer",
+    "DataHashes",
+    "Estimate",
+    "MemoryEstimate",
+    "ModelRef",
+    "TokenStats",
+    "TrainBudget",
+    "TrainConfig",
+    "TrainData",
+    "TrainLogging",
+    "TrainLora",
+    "TrainModel",
+    "TrainOutput",
+    "TrainQuantization",
+    "TrainSettings",
     "MetricValue",
     "Metric",
     "GenerationBackend",

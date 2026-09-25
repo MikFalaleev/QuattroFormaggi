@@ -43,7 +43,7 @@ src/qf/
 │   ├── facts.py         #   LoadFacts (шаг 5)
 │   ├── rendering.py     #   RenderedField, RenderedRequest, RequestDraft (шаг 6)
 │   ├── evaluation.py    #   CaseScore (шаг 9)
-│   ├── training.py      #   TokenStats, Estimate (шаг 12)
+│   ├── training.py      #   TrainConfig, TokenStats, Estimate (шаг 12, D-114)
 │   ├── models.py        #   ModelRef(id, revision) (шаг 12)
 │   ├── ports.py         #   все Protocol-интерфейсы (C.4)
 │   └── versions.py      #   SUPPORTED_SCHEMA_VERSIONS, проверки версий
@@ -141,7 +141,7 @@ flowchart BT
 | `Splitter` | `assign(records, cfg) -> list[SFTRecord]` | `group_hash` (шаг 7) | split по клиенту, по времени |
 | `Metric` | `name: str`; `value(case: CaseScore) -> float\|bool\|None`; `aggregate(values) -> float` — метрика **не** разбирает ответ сама, а читает единый `CaseScore` из `score_prediction` (шаг 9), где строгий и мягкий разбор уже сделаны один раз | метрики шага 9 | метрики card_v2, LLM-as-judge (только локальный) |
 | `GenerationBackend` | `name`; `model_id() -> str`; `generate(req: GenerationRequest) -> GenerationResult` | `fake`, `openai_local`, `hf_local` (шаги 9, 10, 14) | Ollama, vLLM, MLX |
-| `AdapterTrainer` | `estimate(cfg, token_stats: TokenStats) -> Estimate`; `train(cfg, train: ArtifactRef, val: ArtifactRef, run_dir, resume: Path\|None) -> ArtifactRef` (kind=`lora_adapter`) | `hf_trainer_qlora` (шаг 12) | TRL, MLX LoRA на Mac, Unsloth |
+| `AdapterTrainer` | `estimate(cfg: TrainConfig, token_stats: TokenStats, measured_tokens_per_s: float\|None) -> Estimate`; `train(cfg, train: ArtifactRef, val: ArtifactRef, run_dir, resume: Path\|None) -> ArtifactRef` (kind=`lora_adapter`) | `hf_trainer_qlora` (шаг 12) | TRL, MLX LoRA на Mac, Unsloth |
 | `Merger` | `merge(base: ModelRef, adapter: ArtifactRef, out: Path) -> ArtifactRef` (kind=`hf_model`) | `peft_merge` (шаг 16) | — |
 | `ModelConverter` | `convert(model: ArtifactRef, out: Path, outtype: str) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_convert` (шаг 17) | MLX-формат |
 | `Quantizer` | `quantize(gguf: ArtifactRef, qtype: str, out: Path) -> ArtifactRef` | `llama_cpp_quantize` (шаг 17) | другие схемы квантования |
@@ -321,12 +321,13 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.special_conditions`, `special_conditions_exact_rate`, `field_accuracy.special_conditions.temperature`, `field_accuracy.special_conditions.securing`, `field_accuracy.special_conditions.packaging`, `field_accuracy.special_conditions.oversize`, `field_accuracy.special_conditions.sensors` (только `card_v2`) | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | V6 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `critical_error_count.hallucinated_condition`, `critical_error_count.missed_condition` (только `card_v2`) | `qf.eval.metrics.builtin:CountMetric` (подклассы, `_count`)` | V6 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `condition_precision`, `condition_recall`, `condition_precision.temperature`, `condition_precision.securing`, `condition_precision.packaging`, `condition_precision.oversize`, `condition_precision.sensors`, `condition_recall.temperature`, `condition_recall.securing`, `condition_recall.packaging`, `condition_recall.oversize`, `condition_recall.sensors` (только `card_v2`) | `qf.eval.metrics.builtin:ConditionDetection` (подклассы, `_detection`) | V6 | нет |
+| `AdapterTrainer` | `TRAINERS` (`qf.training`, kind `trainer`) | `hf_trainer_qlora` (HF Trainer + peft; загрузчики `cuda_4bit` — QLoRA nf4 на одном GPU, `tiny_random_cpu` — случайная крошечная Mistral для тестов на CPU) | `qf.training.trainers.hf_qlora:HFQLoRATrainer` | 12 (D-114) | да (`cli/wiring.py`, extra `train-cuda`) |
 
 ## Реализация на шаге 1: отличия от текста Части C
 
 - Тяжёлые библиотеки в `qf.common` импортируются по имени во время выполнения только в двух местах — `common/doctor.py` и `common/seed.py` — через `qf.common._optional.import_optional`. Статический анализ `import-linter` таких импортов не видит, поэтому их набор ограничен и помечен комментариями в коде.
 - Команда оценки называется `qf eval run` (а не `qf eval`): имя команды не может одновременно быть группой (`qf eval compare`) — иначе argparse принимает позиционный аргумент за подкоманду.
-- `cli.wiring.build()` получает класс `Config` реализации, импортируя саму реализацию; путь к отдельному лёгкому модулю `Config` в ленивой записи реестра (C.5) пока не реализован — добавить на шаге 12, если конфиг обучения нужно валидировать без torch (D-021).
+- `cli.wiring.build()` получает класс `Config` реализации, импортируя саму реализацию; путь к отдельному лёгкому модулю `Config` в ленивой записи реестра (C.5) не реализован (D-021): на шаге 12 он не понадобился — torch установлен и на Mac, и на GPU-машине (D-114).
 - Порт `RawSource` (шаг 2) шире строки таблицы C.4: `target(dest_root) -> Path` (где лежит или будет лежать артефакт — нужен для идемпотентного `qf data fetch` и `--verify-only`) и `fetch(dest_root, run_id)` (run создаёт вызывающий сценарий `fetch_raw_dataset`, а не адаптер: общая логика «уже скачано → проверить» и запись `run_manifest.json` не дублируются в каждой реализации). См. D-023.
 - Форматы на диске версионируются полями `manifest_version` (`run_manifest_v1`), `artifact_manifest_version` (`artifact_manifest_v1`), `report_version` (`doctor_v1`) (D-019).
 - `Registry(kind, port=..., discoverable=True)`: реестр хранит свой порт (для проверки «у каждого порта есть реализация») и регистрируется в глобальном списке `all_registries()`; частные реестры в тестах создаются с `discoverable=False`.

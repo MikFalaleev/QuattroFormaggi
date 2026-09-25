@@ -22,8 +22,10 @@ from qf.contracts.facts_v2 import AnyLoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult
 from qf.contracts.records import Language, SFTRecord
 from qf.contracts.rendering import RenderedRequest, RequestDraft
+from qf.contracts.training import Estimate, TokenStats, TrainConfig
 
 __all__ = [
+    "AdapterTrainer",
     "FactsBuilder",
     "GenerationBackend",
     "HardCase",
@@ -141,4 +143,29 @@ class Metric(Protocol):
 
     def aggregate(self, values: Sequence[MetricValue]) -> float | None:
         """The metric over cases; None if no case applies (also for an empty list)."""
+        ...
+
+
+@runtime_checkable
+class AdapterTrainer(Protocol):
+    """Trains a LoRA adapter on SFT records (step 12). Parameters of the implementation are its
+    own `Config`; `cfg` is the backend-independent training config."""
+
+    def estimate(
+        self, cfg: TrainConfig, token_stats: TokenStats, measured_tokens_per_s: float | None
+    ) -> Estimate:
+        """Steps, processed tokens, GPU hours, cost and rough memory; no GPU is used."""
+        ...
+
+    def train(
+        self,
+        cfg: TrainConfig,
+        train: ArtifactRef,
+        val: ArtifactRef,
+        run_dir: Path,
+        resume: Path | None,
+    ) -> ArtifactRef:
+        """Train into `run_dir` (continuing from checkpoint `resume` if given) and return the
+        `lora_adapter` artifact. A run stopped early (wall time, NaN) raises `QFError` after
+        saving a checkpoint and recording the status in `run_manifest.json`."""
         ...

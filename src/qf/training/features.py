@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final, Literal, Protocol
 
 from qf.common import QFError
-from qf.contracts import SFTRecord
+from qf.contracts import SFTRecord, TokenStats
 
 __all__ = [
     "IGNORE_INDEX",
@@ -29,6 +29,7 @@ __all__ = [
     "build_features",
     "check_template",
     "chat_ids",
+    "token_stats",
 ]
 
 IGNORE_INDEX: Final = -100
@@ -158,3 +159,17 @@ def check_template(record: SFTRecord, tok: ChatTokenizer) -> TemplateCheck:
     difference = ("the template drops the system prompt from the finished dialogue"
                   if not check.system_in_full else "whitespace only")  # fmt: skip
     return TemplateCheck(**{**check.__dict__, "difference": difference})
+
+
+def token_stats(records: Sequence[SFTRecord], tok: ChatTokenizer,
+                max_len: int) -> tuple[TokenStats, list[Skip]]:  # fmt: skip
+    """Token counts of the records that fit `max_len`, exactly as the trainer builds them."""
+    built = [build_features(record, tok, max_len) for record in records]
+    fit = [f for f in built if isinstance(f, Features)]
+    skipped = [f for f in built if isinstance(f, Skip)]
+    lengths = [len(f.input_ids) for f in fit]
+    stats = TokenStats(records=len(fit), skipped_too_long=len(skipped), tokens_total=sum(lengths),
+                       tokens_trainable=sum(f.answer_tokens for f in fit),
+                       tokens_max=max(lengths, default=0),
+                       tokens_mean=sum(lengths) / len(lengths) if lengths else 0.0)  # fmt: skip
+    return stats, skipped
