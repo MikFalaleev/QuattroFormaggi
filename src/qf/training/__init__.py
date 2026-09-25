@@ -32,6 +32,22 @@ from qf.training.estimate import (
     module_shapes,
     steps_for_epochs,
 )
+from qf.training.events import (
+    CONSOLE_FILE,
+    EVENTS_FILE,
+    PREFLIGHT_FILE,
+    append_event,
+    append_preflight,
+    read_events,
+    read_preflights,
+)
+from qf.training.experiments import (
+    EXPERIMENTS_DIR,
+    experiment_config_hash,
+    load_experiment,
+    registered_config,
+    replicates_done,
+)
 from qf.training.features import (
     IGNORE_INDEX,
     ChatTokenizer,
@@ -53,6 +69,13 @@ from qf.training.tokenizer_io import (
     tokenizer_hash,
     verify_tokenizer_files,
 )
+from qf.training.verify import (
+    INTEGRITY_FILE,
+    AdapterCheck,
+    read_safetensors,
+    verify_adapter,
+    verify_run,
+)
 from qf.training.weights_io import (
     WEIGHTS_PROVENANCE_FILE,
     download_base_weights,
@@ -63,6 +86,19 @@ from qf.training.weights_io import (
 TRAINERS: Registry[Any] = Registry("trainer", port=AdapterTrainer)
 
 __all__ = [
+    "CONSOLE_FILE",
+    "EVENTS_FILE",
+    "PREFLIGHT_FILE",
+    "append_preflight",
+    "read_preflights",
+    "EXPERIMENTS_DIR",
+    "INTEGRITY_FILE",
+    "AdapterCheck",
+    "append_event",
+    "read_events",
+    "read_safetensors",
+    "verify_adapter",
+    "verify_run",
     "IGNORE_INDEX",
     "LORA_BYTES_PER_PARAM",
     "PLAN_BASE_PARAMS",
@@ -78,6 +114,10 @@ __all__ = [
     "data_refs",
     "download_base_weights",
     "estimate",
+    "experiment_config_hash",
+    "load_experiment",
+    "registered_config",
+    "replicates_done",
     "hub_files",
     "load_records",
     "load_train_config",

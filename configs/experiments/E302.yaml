@@ -1,0 +1,22 @@
+# A registered experiment (D-118): written and committed BEFORE the run; never edited after it.
+id: E302
+title: Pilot QLoRA, one epoch of generated_v2 (plan step 14, training part)
+registered: 2026-09-25
+plan_step: "14"
+question: >-
+  Does one epoch of QLoRA (r=16, 1,500 records) teach Mistral-Nemo the card_v2 answer, as seen
+  in the training and validation loss and in sample answers, before the full evaluation of
+  step 14 (a later rental)?
+hypotheses:
+  - "H1: all 94 steps finish within the 120-minute limit, without NaN or out-of-memory; the training loop costs at most 500 RUB."
+  - "H2: the validation loss falls from the first check (step 10) to the end; the final value is at most 0.2 nats per answer token."
+  - "H3: at the end the validation loss exceeds the training loss by less than 0.1 (no strong overfitting after one epoch)."
+  - "H4: on the 5 sample val records the model with the adapter gives valid JSON in 5 of 5, without the adapter in at most 1 of 5 (E100: 0.026 without the schema)."
+  - "H5 (only if seeds 43 and 44 are run): the final validation loss differs between the seeds by at most 0.02."
+success: >-
+  H1 and H4. Quality against the release gates (D-112) is decided only by the evaluation of
+  step 14, not by the loss or the samples.
+config: configs/train/qlora_nemo_v0.1.yaml
+config_sha256: 4cd9ccf864b6bf0bc64a0efcc688e1362a7828a446fade958b7c775a955f0270
+seeds: [42, 43, 44]  # 42 is the pilot; 43 and 44 only if time and balance allow (decided after 42)
+requires_approval: true

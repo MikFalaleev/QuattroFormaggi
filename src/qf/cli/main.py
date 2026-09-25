@@ -10,8 +10,10 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from qf import __version__
+from qf.cli.command_log import list_runs, record_command
 from qf.cli.commands import bench, data, doctor, tokens, train, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
@@ -172,6 +174,13 @@ _SPECS = (
         train.configure_run,
     ),
     CommandSpec(
+        "train verify",
+        "12",
+        "check a copied training run: adapter hash, LoRA tensors, logs (D-118)",
+        train.run_verify,
+        train.configure_verify,
+    ),
+    CommandSpec(
         "train fetch-base",
         "12",
         "download the pinned base model weights (~24.5 GB; GPU machine, after approval)",
@@ -231,6 +240,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         args, unknown = parser.parse_known_args(argv)
     except SystemExit as exc:  # --version, --help and usage errors
         return _exit_code(exc)
+    started, runs_before = datetime.now(UTC), list_runs()
+    code = _run(parser, args, unknown)
+    record_command(list(sys.argv[1:] if argv is None else argv), started, code, runs_before)
+    return code
+
+
+def _run(parser: argparse.ArgumentParser, args: argparse.Namespace, unknown: list[str]) -> int:
     spec: CommandSpec = args.spec
     try:
         if spec.handler is None:

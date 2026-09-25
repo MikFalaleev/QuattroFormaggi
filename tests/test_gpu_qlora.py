@@ -26,13 +26,16 @@ def peft_model() -> tuple[Any, Any]:
     pytest.importorskip("bitsandbytes")
     if not torch.cuda.is_available():
         pytest.skip("no CUDA")
+    from qf.training import load_tokenizer
     from qf.training.trainers.hf_qlora.config import HFQLoRATrainerConfig
     from qf.training.trainers.hf_qlora.model_loading import LOADERS, apply_lora
 
     cfg = load_train_config(CONFIG)
-    loaded = LOADERS["cuda_4bit"](cfg, base_model_for(cfg, REPO_ROOT), REPO_ROOT,
-                                  HFQLoRATrainerConfig(loader="cuda_4bit"))  # fmt: skip
-    return apply_lora(loaded.model, cfg.lora), loaded.tokenizer
+    base = base_model_for(cfg, REPO_ROOT)
+    tok = load_tokenizer(base.directory(REPO_ROOT), fix_mistral_regex=base.fix_mistral_regex)
+    loaded = LOADERS["cuda_4bit"](cfg, base, REPO_ROOT, HFQLoRATrainerConfig(loader="cuda_4bit"),
+                                  tok)  # fmt: skip
+    return apply_lora(loaded.model, cfg.lora), tok
 
 
 def test_gpu_bf16_decision() -> None:

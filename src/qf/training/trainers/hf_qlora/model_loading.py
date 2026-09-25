@@ -19,7 +19,7 @@ from transformers import MistralConfig, MistralForCausalLM
 
 from qf.common import QFError
 from qf.contracts import TrainConfig, TrainLora
-from qf.training import BaseModelConfig, load_tokenizer, verify_base_weights
+from qf.training import BaseModelConfig, verify_base_weights
 from qf.training.trainers.hf_qlora.config import HFQLoRATrainerConfig
 
 __all__ = [
@@ -45,7 +45,6 @@ TINY_DIMS: dict[str, Any] = {"hidden_size": 64, "intermediate_size": 128, "num_h
 @dataclass
 class LoadedModel:
     model: Any
-    tokenizer: Any
     device: Device
     precision: Precision
     quantization: str
@@ -62,7 +61,7 @@ def _gpu_facts() -> dict[str, Any]:
 
 
 def load_base_for_training(cfg: TrainConfig, base: BaseModelConfig, root: Path,
-                           params: HFQLoRATrainerConfig) -> LoadedModel:  # fmt: skip
+                           params: HFQLoRATrainerConfig, tok: Any) -> LoadedModel:  # fmt: skip
     """The pinned base in nf4 on GPU 0, prepared for k-bit training, from local files only."""
     if not torch.cuda.is_available():
         raise QFError("CUDA not available: QLoRA training needs an NVIDIA GPU; run it on the GPU "
@@ -92,17 +91,15 @@ def load_base_for_training(cfg: TrainConfig, base: BaseModelConfig, root: Path,
         gradient_checkpointing_kwargs={"use_reentrant": False},
     )  # fmt: skip
     model.config.use_cache = False
-    tok = load_tokenizer(directory, fix_mistral_regex=base.fix_mistral_regex)
-    return LoadedModel(model, tok, "cuda", cfg.quantization.compute_dtype,
+    return LoadedModel(model, "cuda", cfg.quantization.compute_dtype,
                        f"{cfg.quantization.type}, double quant {cfg.quantization.double_quant} "
                        "(bitsandbytes)", base.id, _gpu_facts())  # fmt: skip
 
 
 def load_tiny_for_test(cfg: TrainConfig, base: BaseModelConfig, root: Path,
-                       params: HFQLoRATrainerConfig) -> LoadedModel:  # fmt: skip
-    """A randomly initialised 2-layer Mistral with the base model's tokenizer, fp32 on CPU.
+                       params: HFQLoRATrainerConfig, tok: Any) -> LoadedModel:  # fmt: skip
+    """A randomly initialised 2-layer Mistral sized for the base model's tokenizer, fp32 on CPU.
     Its weights come from the global seed: the caller seeds before loading."""
-    tok = load_tokenizer(base.directory(root), fix_mistral_regex=base.fix_mistral_regex)
     settings: dict[str, Any] = {
         **TINY_DIMS, "attn_implementation": params.attn_implementation,
         "max_position_embeddings": max(512, cfg.training.max_sequence_length),
@@ -111,11 +108,10 @@ def load_tiny_for_test(cfg: TrainConfig, base: BaseModelConfig, root: Path,
     config = MistralConfig(vocab_size=len(tok), **settings)
     model = MistralForCausalLM(config)  # type: ignore[no-untyped-call]
     model.config.use_cache = False
-    return LoadedModel(model, tok, "cpu", "fp32", "none (tiny random model, not a real model)",
-                       None)  # fmt: skip
+    return LoadedModel(model, "cpu", "fp32", "none (tiny random model, not a real model)", None)
 
 
-LOADERS: dict[str, Callable[[TrainConfig, BaseModelConfig, Path, HFQLoRATrainerConfig],
+LOADERS: dict[str, Callable[[TrainConfig, BaseModelConfig, Path, HFQLoRATrainerConfig, Any],
                             LoadedModel]] = {
     "cuda_4bit": load_base_for_training,
     "tiny_random_cpu": load_tiny_for_test,

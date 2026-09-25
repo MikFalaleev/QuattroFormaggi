@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,11 @@ from typing import Any
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 
 from qf.common import RunStatus, read_manifest, update_manifest
+from qf.training import append_event
 
 __all__ = [
     "BatchLog",
+    "EventCallback",
     "JsonlLoggerCallback",
     "ManifestCallback",
     "NanGuardCallback",
@@ -131,3 +134,25 @@ class ManifestCallback(TrainerCallback):
         latest = {f"last_{k}": v for k, v in self.latest.items()}
         metrics = {**read_manifest(self.run_dir).metrics, **latest}
         update_manifest(self.run_dir, metrics=metrics)
+
+
+class EventCallback(TrainerCallback):
+    """Checkpoints and evaluations into `events.jsonl`; the current step to `on_step`."""
+
+    def __init__(self, run_dir: Path, on_step: Callable[[int], None]) -> None:
+        self.run_dir = run_dir
+        self.on_step = on_step
+
+    def on_step_end(self, args: TrainingArguments, state: TrainerState,
+                    control: TrainerControl, **kwargs: Any) -> None:  # fmt: skip
+        self.on_step(state.global_step)
+
+    def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl,
+                **kwargs: Any) -> None:  # fmt: skip
+        append_event(self.run_dir, "checkpoint", step=state.global_step,
+                     path=f"checkpoint-{state.global_step}")  # fmt: skip
+
+    def on_evaluate(self, args: TrainingArguments, state: TrainerState, control: TrainerControl,
+                    metrics: dict[str, Any] | None = None, **kwargs: Any) -> None:  # fmt: skip
+        append_event(self.run_dir, "evaluated", step=state.global_step,
+                     eval_loss=(metrics or {}).get("eval_loss"))  # fmt: skip

@@ -49,6 +49,7 @@ class RunManifest(BaseModel):
     kind: str
     created_at: datetime
     status: RunStatus = "running"
+    experiment_id: str | None = None  # a registered experiment (training runs, D-118)
     git_commit: str | None = None
     git_dirty: bool = False
     hardware: dict[str, Any] = Field(default_factory=dict)

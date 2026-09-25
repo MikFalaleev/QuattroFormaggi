@@ -1,0 +1,23 @@
+# A registered experiment (D-118): written and committed BEFORE the run; never edited after it.
+# `qf train run --experiment E301` runs exactly `config` (its hash, seed excluded) with a seed from
+# `seeds`, on a clean git tree, with the human approval quoted in --approval.
+id: E301
+title: GPU smoke run of the QLoRA pipeline (plan step 13)
+registered: 2026-09-25
+plan_step: "13"
+question: >-
+  Does the QLoRA pipeline run on the rented GPU (1x A100 80 GB) as it did on CPU, and how much
+  memory and time does a real optimizer step take?
+hypotheses:
+  - "H1: exactly 57,016,320 trainable LoRA parameters (r=16, 7 modules, 40 layers)."
+  - "H2: peak GPU memory (torch max allocated) is 15-25 GiB."
+  - "H3: 850-1,700 tokens/s over optimizer steps (all tokens, bf16, gradient checkpointing)."
+  - "H4: the loss is finite at all 15 steps and lower at step 15 than at step 1."
+  - "H5: a run interrupted after checkpoint-10 resumes from it and continues at step 11."
+success: >-
+  H1 exact, no NaN or out-of-memory, H5 works. H2 and H3 are measurements that replace the
+  assumptions of the estimate (E300); a result outside the range is recorded, not a failure.
+config: configs/train/qlora_nemo_v0.1_smoke.yaml
+config_sha256: c731cbc4c9b73e2f1c11fd68603ed24c46881faf26fdaf84c1c3930219ca2a33
+seeds: [42]
+requires_approval: true

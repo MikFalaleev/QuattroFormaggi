@@ -130,6 +130,32 @@ def tiny_config(project: TinyProject, *, dropout: float = 0.0, lora: dict[str, A
     })  # fmt: skip
 
 
+def register(
+    project: TinyProject,
+    cfg: TrainConfig,
+    experiment_id: str = "E901",
+    *,
+    seeds: list[int] | None = None,
+    requires_approval: bool = True,
+) -> str:
+    """Write `cfg` and its registration (configs/experiments/<id>.yaml) into the project."""
+    import yaml
+
+    from qf.training import experiment_config_hash
+
+    config = Path(f"configs/train/{experiment_id.lower()}.yaml")
+    (project.root / config).write_text(yaml.safe_dump(cfg.model_dump(mode="json"),
+                                                      allow_unicode=True), "utf-8")  # fmt: skip
+    spec = {"id": experiment_id, "title": "tiny", "registered": "2026-09-25", "plan_step": "12",
+            "question": "q", "hypotheses": ["h"], "success": "s", "config": config.as_posix(),
+            "config_sha256": experiment_config_hash(cfg), "seeds": seeds or [cfg.seed],
+            "requires_approval": requires_approval}  # fmt: skip
+    path = project.root / "configs/experiments" / f"{experiment_id}.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(spec), "utf-8")
+    return experiment_id
+
+
 def git_init(root: Path) -> None:
     """A committed git repository in `root` (the manifest records the commit)."""
 

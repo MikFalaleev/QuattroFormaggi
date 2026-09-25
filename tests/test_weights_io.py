@@ -84,7 +84,9 @@ def test_files_not_on_the_hub_are_refused(fake_project: Path, fake_hub: dict[str
 def test_cli_fetch_base(fake_project: Path, fake_hub: dict[str, bytes],
                         capsys: pytest.CaptureFixture[str]) -> None:  # fmt: skip
     base_config(fake_project)
-    assert main(["train", "fetch-base"]) == 0
+    assert main(["train", "fetch-base"]) == 1  # 24.5 GB only with the human decision
+    assert "needs the human decision" in capsys.readouterr().err
+    assert main(["train", "fetch-base", "--approval", "user, 2026-09-25: «Да, разрешаю»"]) == 0
     out: Any = capsys.readouterr().out
     assert "Downloading 2 files of fake/model@aaaaaaaaaaaa" in out and "sha256 checked" in out
     assert "0.0 GB" in out

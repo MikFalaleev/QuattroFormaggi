@@ -36,6 +36,7 @@ PLANNED_COMMANDS = {
     "train estimate",
     "train run",
     "train fetch-base",
+    "train verify",
     "export merge",
     "export gguf",
     "export verify",

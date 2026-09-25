@@ -30,6 +30,7 @@ from qf.common.doctor import (
     collect_environment,
     collect_hardware,
     format_environment_report,
+    machine_label,
 )
 from qf.common.errors import DataValidationError, Issue, NotImplementedStageError, QFError
 from qf.common.hashing import canonical_json, sha256_file, sha256_json, sha256_text
@@ -101,6 +102,7 @@ __all__ = [
     "format_validation_error",
     "format_environment_report",
     "lineage",
+    "machine_label",
     "load_artifact_manifest",
     "load_yaml_config",
     "manifest_path_for",

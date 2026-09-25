@@ -8,6 +8,7 @@ stage loads it from YAML and runs the preflight checks (`qf.training.config`).
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Final, Literal
 
@@ -17,8 +18,10 @@ from qf.common import ComponentConfig, StrictConfig
 
 __all__ = [
     "PLACEHOLDER_REVISION",
+    "Preflight",
     "DataHashes",
     "Estimate",
+    "ExperimentSpec",
     "MemoryEstimate",
     "TokenStats",
     "TrainBudget",
@@ -193,3 +196,51 @@ class Estimate(_Computed):
     lora_trainable_params: int | None
     memory: MemoryEstimate
     notes: list[str] = Field(default_factory=list)
+
+
+class ExperimentSpec(StrictConfig):
+    """`configs/experiments/EXXX.yaml`: an experiment registered in Git before it runs (D-118).
+
+    The training config is fixed by its hash (without the seed): a run under this ID with other
+    parameters is refused. `seeds` lists the allowed replicates of the same config."""
+
+    id: str = Field(pattern=r"^E\d{3}$")
+    title: str = Field(min_length=1)
+    registered: date
+    plan_step: str = Field(min_length=1)
+    question: str = Field(min_length=1)
+    hypotheses: list[str] = Field(min_length=1)
+    success: str = Field(min_length=1)
+    config: Path
+    config_sha256: str = Field(pattern=_SHA256)
+    seeds: list[int] = Field(min_length=1)
+    requires_approval: bool = True
+    notes: str = ""
+
+    @field_validator("seeds")
+    @classmethod
+    def _distinct(cls, value: list[int]) -> list[int]:
+        if len(set(value)) != len(value):
+            raise ValueError("seeds must be distinct")
+        return value
+
+
+class Preflight(_Computed):
+    """One line of `preflight.jsonl` in a run directory, written by `qf train run` before any
+    model is loaded (one line per session: the start and every resume)."""
+
+    session: int = Field(ge=1)
+    created_at: datetime
+    run_id: str
+    experiment_id: str | None
+    seed: int
+    config_sha256: str  # the training config without its seed (see ExperimentSpec)
+    approval: str | None  # the human decision that allowed this session, quoted
+    allow_code_change: str | None = None  # resume only: why a different commit is accepted
+    resume_from: str | None = None
+    git_commit: str | None
+    git_dirty: bool
+    host: str  # a non-identifying machine label (qf.common.machine_label)
+    checks: list[str]  # the preflight checks that passed
+    token_stats: TokenStats
+    estimate: Estimate

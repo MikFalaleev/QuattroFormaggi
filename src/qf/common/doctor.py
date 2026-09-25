@@ -6,6 +6,7 @@ packages and local services. Hardware serial numbers are never collected.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import platform
 import shutil
@@ -28,6 +29,7 @@ __all__ = [
     "collect_environment",
     "collect_hardware",
     "format_environment_report",
+    "machine_label",
 ]
 
 DEFAULT_REPORT_PATH = RUNS / "doctor" / "hardware.json"
@@ -58,6 +60,13 @@ def _chip() -> str | None:
     except (OSError, subprocess.SubprocessError):
         return None
     return result.stdout.strip() or None
+
+
+def machine_label() -> str:
+    """A stable, non-identifying name of this machine for run files: the OS and a short hash of
+    the host name (host names often contain a person's name, e.g. "MacBook-Pro-<name>")."""
+    digest = hashlib.sha256(platform.node().encode("utf-8")).hexdigest()[:6]
+    return f"{platform.system().lower() or 'unknown'}-{digest}"
 
 
 def collect_hardware() -> dict[str, Any]:

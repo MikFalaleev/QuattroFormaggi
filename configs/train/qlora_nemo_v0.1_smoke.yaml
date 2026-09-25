@@ -1,0 +1,60 @@
+# Experiment E301 (plan step 13): the GPU smoke run — the pilot's settings for 15 optimizer steps
+# on train, validation and a checkpoint every 5 steps. Its own file, not command-line overrides:
+# a registered experiment runs exactly its config (D-118).
+#   uv run qf train run --experiment E301 --approval "…"
+run_name: qf-12b-logistics-v0.1-smoke
+seed: 42
+model:
+  id: mistralai/Mistral-Nemo-Instruct-2407
+  revision: 04d8a90549d23fc6bd7f642064003592df51e9b3
+  base_model_config: configs/train/base_model.yaml
+  preserve_tokenizer: true
+  preserve_chat_template: true
+quantization:
+  load_in_4bit: true
+  type: nf4
+  double_quant: true
+  compute_dtype: bf16
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+data:
+  train_path: data/processed/generated_v2/train.jsonl
+  val_path: data/processed/generated_v2/val.jsonl
+  expected_sha256:
+    train: 968c144affeffc9b733f0a249832284e75caa97359a0ae11b2e85dd70c6f72db
+    val: 731a1c5badc242f753f4b819dba8046f53acd05740f457206eb79c5da3c71916
+training:
+  max_sequence_length: 2048
+  micro_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 1.0e-4
+  epochs: 1
+  max_steps: 15                      # a partial pass: measures speed and memory on real lengths
+  max_wall_time_minutes: 40
+  warmup_ratio: 0.03
+  lr_scheduler: cosine
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  use_cache: false
+  packing: false
+  loss_scope: assistant_tokens_only
+  checkpoint_every_optimizer_steps: 5
+  evaluate_every_optimizer_steps: 5
+  keep_checkpoints: 3
+logging:
+  external_reporting: false
+  record_peak_memory: true
+budget:
+  gpu_hourly_rate: 231.17
+  measured_tokens_per_s: null
+  max_cost: 200
+  currency: RUB
+  overhead_factor: 1.3
+output:
+  run_root: runs
+trainer:
+  name: hf_trainer_qlora
+  loader: cuda_4bit

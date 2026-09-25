@@ -17,6 +17,13 @@ def fake_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
+@pytest.fixture(autouse=True)
+def isolated_command_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`qf` commands log to runs/commands-<host>.jsonl (D-118); tests never write to the real
+    project, so every test logs to its own temporary file."""
+    monkeypatch.setenv("QF_COMMAND_LOG", str(tmp_path / "commands.jsonl"))
+
+
 # Tests with these markers touch the outside world or special hardware. They are skipped
 # unless explicitly enabled, so a bare `pytest` never downloads anything (rule A.2.4).
 OPT_IN_MARKERS = {
