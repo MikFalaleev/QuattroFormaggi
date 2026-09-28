@@ -112,9 +112,13 @@ def discover_ports(module: ModuleType) -> list[type[Any]]:
 def ports_without_implementation(
     ports: Iterable[type[Any]], registries: Iterable[Registry[Any]]
 ) -> list[str]:
+    """A port extension (a Protocol based on another port, e.g. `BatchGenerationBackend`) counts
+    as implemented through the registry of the port it extends."""
     registries = list(registries)
     return [
-        port.__name__ for port in ports if not any(r.port is port and r.names() for r in registries)
+        port.__name__
+        for port in ports
+        if not any(r.port in port.__mro__ and r.names() for r in registries)
     ]
 
 

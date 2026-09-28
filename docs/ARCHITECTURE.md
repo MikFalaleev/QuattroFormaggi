@@ -141,6 +141,7 @@ flowchart BT
 | `Splitter` | `assign(records, cfg) -> list[SFTRecord]` | `group_hash` (шаг 7) | split по клиенту, по времени |
 | `Metric` | `name: str`; `value(case: CaseScore) -> float\|bool\|None`; `aggregate(values) -> float` — метрика **не** разбирает ответ сама, а читает единый `CaseScore` из `score_prediction` (шаг 9), где строгий и мягкий разбор уже сделаны один раз | метрики шага 9 | метрики card_v2, LLM-as-judge (только локальный) |
 | `GenerationBackend` | `name`; `model_id() -> str`; `generate(req: GenerationRequest) -> GenerationResult` | `fake`, `openai_local`, `hf_local` (шаги 9, 10, 14) | Ollama, vLLM, MLX |
+| `BatchGenerationBackend` (расширяет `GenerationBackend`, шаг 14, D-120) | `batch_size`; `generate_batch(reqs) -> list[GenerationResult]` — по результату на запрос, по порядку; ответы не зависят от пакета | `hf_local` | vLLM |
 | `AdapterTrainer` | `estimate(cfg: TrainConfig, token_stats: TokenStats, measured_tokens_per_s: float\|None) -> Estimate`; `train(cfg, train: ArtifactRef, val: ArtifactRef, run_dir, resume: Path\|None) -> ArtifactRef` (kind=`lora_adapter`) | `hf_trainer_qlora` (шаг 12) | TRL, MLX LoRA на Mac, Unsloth |
 | `Merger` | `merge(base: ModelRef, adapter: ArtifactRef, out: Path) -> ArtifactRef` (kind=`hf_model`) | `peft_merge` (шаг 16) | — |
 | `ModelConverter` | `convert(model: ArtifactRef, out: Path, outtype: str) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_convert` (шаг 17) | MLX-формат |
@@ -239,7 +240,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | Файл | Что проверяет для каждой реализации |
 |---|---|
 | `tests/contracts/test_template_family_contract.py` | Параметризован по `TEMPLATE_FAMILIES.names()` × `HARD_CASES.names()`: инварианты E1–E15 шага 6 |
-| `tests/contracts/test_backend_contract.py` | Для всех backend'ов, доступных без сети/GPU (`fake`, `openai_local` с `httpx.MockTransport`): возвращает `GenerationResult`; ошибка → `result.error`, а не исключение; не шлёт assistant-сообщение; `openai_local` отклоняет non-loopback URL |
+| `tests/contracts/test_backend_contract.py` | Для всех backend'ов, доступных без сети/GPU (`fake`, `openai_local` с `httpx.MockTransport`, `hf_local` на крошечной случайной модели на CPU, без torch — пропуск): возвращает `GenerationResult`; ошибка → `result.error`, а не исключение; не шлёт assistant-сообщение; `openai_local` отклоняет non-loopback URL |
 | `tests/contracts/test_metric_contract.py` | Для всех `METRICS`: идеальный ответ → лучший балл; невалидный JSON → худший или `None`; `aggregate([])` не падает |
 | `tests/contracts/test_trainer_contract.py` (`slow`) | Для тренеров, доступных на CPU: tiny-модель → артефакт `lora_adapter` с корректным манифестом; resume-эквивалентность |
 | `tests/contracts/test_artifact_roundtrip.py` | Для всех `kind`: `write_artifact` → `read_artifact` → тот же `ArtifactRef`; подмена байта → ошибка хэша; чужой kind/версия → ошибка; абсолютный путь отклоняется; дерево, скопированное в другой корень (`tmp_path/a` → `tmp_path/b`), читается без ошибок |
@@ -310,6 +311,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | — (реестр без порта: записи — `TargetSchema`) | `TARGET_SCHEMAS` (`qf.domain`, kind `target_schema`) | `card_v1`, `card_v2` (разбор, запись, правило недостающих полей, согласованность, JSON-схема) | `qf.domain.schemas` | V1 (D-086) | нет |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `fake` (подготовленные ответы по sha256 user-сообщения; не модель) | `qf.backends.fake:FakeBackend` | 9 | нет |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `openai_local` (LM Studio / llama-server по OpenAI-совместимому API, только адреса этого компьютера) | `qf.backends.openai_local:OpenAILocalBackend` | 10 | нет (лёгкая: httpx) |
+| `GenerationBackend`, `BatchGenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `hf_local` (HF transformers: закреплённая база в 4 бит, как при обучении, с адаптером LoRA или без; жадная генерация пакетами по `batch_size`, D-120) | `qf.backends.hf_local:HFLocalBackend` | 14 | да (лениво: torch, transformers, peft; 4 бит — bitsandbytes и CUDA; extra `train-cuda`) |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `baseline_empty` (пустая карточка — нижняя граница, не модель), `baseline_rules` (извлекатель на регулярных выражениях — нижняя граница, не модель) | `qf.baselines.backends:EmptyBaseline`, `qf.baselines.backends:RulesBaseline` | 10 (D-109) | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
@@ -395,6 +397,12 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Второй слой композиции рядом с CLI: `qf/cli/webui/` (логика `app.py`, HTTP `server.py` на `http.server`, страница `static/index.html`). Как и команды CLI, он импортирует стадии (`qf.data`, `qf.eval`) и домен, а стадии о нём не знают. Своих реестров и портов нет: оценка берётся из `SCORERS`, генерация — из `render_record`.
 - Сервер слушает только адреса этого компьютера и ничего не пишет в проект.
+
+## Реализация шага 14: отличия от текста Части C
+
+- Порт-расширение `BatchGenerationBackend` (D-120): harness посылает до `batch_size` запросов за раз, если backend его реализует; иначе — по одному, как раньше. Своего реестра у расширения нет: реализации регистрируются в `BACKENDS` по основному порту `GenerationBackend` (архитектурный тест засчитывает порт-расширение через реестр его родителя). `batch_size` пишется в `eval_state.json` и входит в `RESUME_KEYS` только у пакетных backend'ов — состояние прежних прогонов не меняется.
+- `hf_local` не импортирует `qf.training`: промпт строится тем же `apply_chat_template` по сообщениям, токенизатор — из тех же локальных файлов с тем же `fix_mistral_regex`, pad — существующий `<pad>`; равенство промптов обучения и оценки проверяет тест на закреплённом токенизаторе.
+- `BenchRef.kind: sft_dataset` — оценка целого split (`test`, `test_ood` из `data/splits_v2/`, без записей бенчмарка), шаг 14, действие 5.
 
 ## Реализация шага 10: отличия от текста Части C
 

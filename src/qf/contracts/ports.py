@@ -26,6 +26,7 @@ from qf.contracts.training import Estimate, TokenStats, TrainConfig
 
 __all__ = [
     "AdapterTrainer",
+    "BatchGenerationBackend",
     "FactsBuilder",
     "GenerationBackend",
     "HardCase",
@@ -126,6 +127,19 @@ class GenerationBackend(Protocol):
 
     def generate(self, req: GenerationRequest) -> GenerationResult:
         """One answer. Timeouts and HTTP errors go to `result.error`; nothing is raised."""
+        ...
+
+
+@runtime_checkable
+class BatchGenerationBackend(GenerationBackend, Protocol):
+    """A backend that answers several requests at once (HF, step 14): the harness sends up to
+    `batch_size` requests per call. Answers must not depend on the batch (greedy decoding)."""
+
+    @property
+    def batch_size(self) -> int: ...
+
+    def generate_batch(self, reqs: Sequence[GenerationRequest]) -> list[GenerationResult]:
+        """One result per request, in order; failures go to each `result.error`."""
         ...
 
 

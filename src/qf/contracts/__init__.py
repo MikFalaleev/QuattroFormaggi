@@ -46,6 +46,7 @@ from qf.contracts.generation import GenerationRequest, GenerationResult, Message
 from qf.contracts.models import ModelRef
 from qf.contracts.ports import (
     AdapterTrainer,
+    BatchGenerationBackend,
     FactsBuilder,
     GenerationBackend,
     HardCase,
@@ -114,6 +115,7 @@ __all__ = [
     "TrainSettings",
     "MetricValue",
     "Metric",
+    "BatchGenerationBackend",
     "GenerationBackend",
     "CaseScore",
     "CaseScoreV2",

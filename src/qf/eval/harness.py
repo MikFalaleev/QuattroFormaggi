@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Final, get_args
+from typing import Any, Final, Literal, get_args
 
 from pydantic import Field, model_validator
 
@@ -34,6 +34,7 @@ from qf.common import (
     write_artifact,
 )
 from qf.contracts import (
+    BatchGenerationBackend,
     CaseScore,
     GenerationBackend,
     GenerationRequest,
@@ -70,6 +71,7 @@ __all__ = [
     "EvalConfig",
     "compare_stage",
     "GenerationSettings",
+    "batch_size_of",
     "load_bench",
     "metrics_table",
     "run_eval",
@@ -100,6 +102,8 @@ class GenerationSettings(StrictConfig):
 class BenchRef(StrictConfig):
     path: Path  # relative to the project root
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    # a frozen benchmark, or a whole split such as test / test_ood (plan step 14, D-120)
+    kind: Literal["benchmark", "sft_dataset"] = "benchmark"
 
 
 class BootstrapSettings(StrictConfig):
@@ -131,15 +135,21 @@ class EvalConfig(StrictConfig):
 
 
 def load_bench(cfg: EvalConfig, root: Path) -> tuple[ArtifactRef, list[SFTRecord]]:
-    """The benchmark, verified against its manifest, its `.sha256` file and the config."""
-    ref = read_artifact(cfg.bench.path, "benchmark", supported_versions("benchmark"), root=root)
+    """The benchmark, verified against its manifest, its `.sha256` file and the config; a
+    split (`kind: sft_dataset`) against its manifest and the config."""
+    kind = cfg.bench.kind
+    ref = read_artifact(cfg.bench.path, kind, supported_versions(kind), root=root)
     sha_file = (root / ref.path).with_suffix(".sha256")
-    declared = sha_file.read_text(encoding="utf-8").split()[0] if sha_file.exists() else None
+    if kind == "benchmark":
+        declared = sha_file.read_text(encoding="utf-8").split()[0] if sha_file.exists() else None
+    else:
+        declared = ref.sha256  # splits have no `.sha256` file; the manifest hash is checked
     if ref.sha256 != cfg.bench.sha256 or declared != ref.sha256:
         raise QFError(f"{ref.path}: sha256 {ref.sha256} differs from the config "
                       f"({cfg.bench.sha256}) or {sha_file.name} ({declared})")  # fmt: skip
     records, issues = parse_sft_jsonl((root / ref.path).read_text(encoding="utf-8"),
-                                      source=ref.path.name, split="bench")  # fmt: skip
+                                      source=ref.path.name,
+                                      split="bench" if kind == "benchmark" else None)  # fmt: skip
     if issues:
         raise QFError(f"{ref.path}: {len(issues)} invalid record(s), e.g. {issues[0]}")
     return ref, records
@@ -163,6 +173,25 @@ def _generate(backend: GenerationBackend, req: GenerationRequest) -> GenerationR
     except Exception as exc:  # a backend must not raise; if it does, the case still counts
         return GenerationResult(text="", latency_s=time.monotonic() - started,
                                 error=f"backend raised {type(exc).__name__}: {exc}")  # fmt: skip
+
+
+def _generate_batch(backend: BatchGenerationBackend,
+                    reqs: Sequence[GenerationRequest]) -> list[GenerationResult]:  # fmt: skip
+    started = time.monotonic()
+    try:
+        results = backend.generate_batch(reqs)
+        if len(results) == len(reqs):
+            return list(results)
+        error = f"backend returned {len(results)} results for {len(reqs)} requests"
+    except Exception as exc:  # every case of the batch still counts, as a failure
+        error = f"backend raised {type(exc).__name__}: {exc}"
+    latency = (time.monotonic() - started) / len(reqs)
+    return [GenerationResult(text="", latency_s=latency, error=error) for _ in reqs]
+
+
+def batch_size_of(backend: GenerationBackend) -> int:
+    """How many requests the harness sends at once: 1 unless the backend answers batches."""
+    return backend.batch_size if isinstance(backend, BatchGenerationBackend) else 1
 
 
 def _request(record: SFTRecord, settings: GenerationSettings,
@@ -226,7 +255,7 @@ def _state(cfg: EvalConfig, backend: GenerationBackend, bench: ArtifactRef,
     if schema not in SCORED_SCHEMAS:
         raise QFError(f"answers in {schema} cannot be scored "
                       f"(scored: {', '.join(SCORED_SCHEMAS)})")  # fmt: skip
-    state = {
+    state: dict[str, Any] = {
         "name": cfg.name, "backend": backend.name, "model_id": backend.model_id(),
         "bench_path": bench.path.as_posix(), "bench_sha256": bench.sha256,
         "schema_version": schema,
@@ -237,13 +266,15 @@ def _state(cfg: EvalConfig, backend: GenerationBackend, bench: ArtifactRef,
     }  # fmt: skip
     if cfg.generation.json_schema:
         state["json_schema_sha256"] = sha256_json(get_target_schema(schema).json_schema())
+    if isinstance(backend, BatchGenerationBackend):  # only then, so older states keep their form
+        state["batch_size"] = backend.batch_size
     return state
 
 
 # What must not change when a run is resumed: otherwise its answers come from two setups.
 RESUME_KEYS: Final = (
     "bench_sha256", "prompt_sha256", "schema_version", "generation", "json_schema_sha256",
-    "backend", "model_id",
+    "backend", "model_id", "batch_size",
 )  # fmt: skip
 
 
@@ -284,17 +315,22 @@ def run_eval(
     if unknown:
         raise QFError(f"{predictions_path}: answers to records outside the benchmark, "
                       f"e.g. {sorted(unknown)[0]}")  # fmt: skip
+    # a resumed run keeps the answers and asks again where generation failed (e.g. the server
+    # went down): the later line of a record wins when predictions are read
+    pending = [r for r in records if not (r.id in done and done[r.id]["error"] is None)]
+    size = batch_size_of(backend)
     with predictions_path.open("a", encoding="utf-8") as out:
-        for record in records:
-            # a resumed run keeps the answers and asks again where generation failed (e.g. the
-            # server went down): the later line of a record wins when predictions are read
-            if record.id in done and done[record.id]["error"] is None:
-                continue
-            result = _generate(backend, _request(record, cfg.generation, json_schema))
-            item = {"id": record.id, "output": result.text, **result.model_dump(exclude={"text"})}
-            out.write(json.dumps(item, ensure_ascii=False) + "\n")
+        for start in range(0, len(pending), size):
+            chunk = pending[start : start + size]
+            reqs = [_request(r, cfg.generation, json_schema) for r in chunk]
+            results = (_generate_batch(backend, reqs) if isinstance(backend, BatchGenerationBackend)
+                       and size > 1 else [_generate(backend, reqs[0])])  # fmt: skip
+            for record, result in zip(chunk, results, strict=True):
+                item = {"id": record.id, "output": result.text,
+                        **result.model_dump(exclude={"text"})}  # fmt: skip
+                out.write(json.dumps(item, ensure_ascii=False) + "\n")
+                done[record.id] = item
             out.flush()
-            done[record.id] = item
     scorer = get_scorer(state["schema_version"])
     scores = [
         scorer.score(r.id, target.parse(r.messages[2].content), done[r.id]["output"],

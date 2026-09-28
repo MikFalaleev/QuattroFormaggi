@@ -17,8 +17,11 @@
 
 ## Шаги 13–16 (обучение и экспорт)
 
-- [ ] **Слияние отказывает адаптеру тестовой модели.** Адаптер репетиции на CPU (`loader: tiny_random_cpu`) обучен на случайной крошечной модели; в `adapter_config.json` он называет себя «tiny random Mistral», в `qf_adapter_manifest.json` — `loader: tiny_random_cpu`. `qf export merge` (шаг 16) и `hf_local` (шаг 14) должны принимать только `loader: cuda_4bit` (D-117).
-- [ ] **Правило остановки по val loss** («растёт две проверки подряд — остановить и взять лучшую точку», шаг 14) записать в `docs/EVAL_SPEC.md` до запуска пилота; проверки идут каждые 10 шагов (D-116).
+- [ ] **Слияние отказывает адаптеру тестовой модели** (`hf_local` уже отказывает — D-120; осталось `qf export merge`, шаг 16). Адаптер репетиции на CPU (`loader: tiny_random_cpu`) обучен на случайной крошечной модели; в `adapter_config.json` он называет себя «tiny random Mistral», в `qf_adapter_manifest.json` — `loader: tiny_random_cpu`. `qf export merge` (шаг 16) и `hf_local` (шаг 14) должны принимать только `loader: cuda_4bit` (D-117).
+- [ ] **Манифест прогона после `--resume`** (найдено в E301, 28.09.2026): при статусе `completed` в `metrics` остаются ключи прерванного сеанса — `stop_reason: interrupted (SIGINT)`, `last_checkpoint: checkpoint-10`; правдивая история есть в `events.jsonl`. Очищать ключи остановки при продолжении или хранить метрики по сеансам.
+- [ ] **`train_loss` HF Trainer после `--resume` неверен** (E301: 0,0035 — сумма loss 5 шагов второго сеанса делится на все 15). Не записывать его в метрики продолжённого прогона или считать по `train_log.jsonl`.
+- [ ] **Пустые `wall_time` и `peak_memory` в `run_manifest.json`** (E301, E302): верхние поля `None`, хотя `record_peak_memory: true`, а данные есть в `metrics` (`session_optimizer_steps_seconds`, `gpu_memory_used_peak_mib`) и `resources.jsonl` (`torch_max_allocated_bytes`). Ограничение 4 CLAUDE.md требует их заполнять.
+- [x] **Правило остановки по val loss** — не записано до пилота (пропуск агента); ни у одного seed E302 val loss не рос две проверки подряд, оценивается последняя точка (D-120). Было: («растёт две проверки подряд — остановить и взять лучшую точку», шаг 14) записать в `docs/EVAL_SPEC.md` до запуска пилота; проверки идут каждые 10 шагов (D-116).
 
 ## Шаг 10 (baseline)
 

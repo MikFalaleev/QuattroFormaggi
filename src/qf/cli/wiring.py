@@ -1,7 +1,6 @@
 """Composition root: the only place where implementations are chosen (plan C.3, C.5).
 
-Later steps register heavy adapters here lazily, e.g.
-`BACKENDS.register_lazy("hf_local", "qf.backends.hf_local:HFLocalBackend", extra="train-cuda")`.
+Heavy adapters are registered here lazily (the trainer of step 12, the HF backend of step 14).
 Adapter modules are referenced only as strings: this module never imports them at top level.
 Importing this module makes every registry (and every lazy entry) visible to
 `qf.common.all_registries()`.
@@ -18,6 +17,7 @@ import qf.baselines  # noqa: F401  (registers the lower-bound baselines in BACKE
 import qf.data  # noqa: F401  (imported for its registries: RAW_SOURCES)
 import qf.domain  # noqa: F401  (imported for its registries: TASKS)
 import qf.eval  # noqa: F401  (imported for its registries: METRICS)
+from qf.backends import BACKENDS
 from qf.common import ComponentConfig, QFError, Registry
 from qf.training import TRAINERS
 
@@ -25,6 +25,7 @@ __all__ = ["build"]
 
 TRAINERS.register_lazy("hf_trainer_qlora", "qf.training.trainers.hf_qlora:HFQLoRATrainer",
                        extra="train-cuda")  # fmt: skip
+BACKENDS.register_lazy("hf_local", "qf.backends.hf_local:HFLocalBackend", extra="train-cuda")
 
 
 def build(registry: Registry[Any], selector: ComponentConfig) -> Any:

@@ -1,16 +1,18 @@
 """Contract test of every registered generation backend (plan C.8, step 9).
 
 Each backend must be testable offline: `OFFLINE_CONFIGS` holds a configuration that needs no
-network, GPU or model (`openai_local`, step 10: a mock LM Studio). A backend registered
-without an entry here fails `test_every_backend_has_an_offline_config`. Backends that answer
-from prepared answers (`fake`, the mock server) return exactly `ANSWER`; the lower-bound
-baselines (D-109) compute a valid card_v2 answer for any request.
+network, GPU or model (`openai_local`, step 10: a mock LM Studio; `hf_local`, step 14: a tiny
+random model on the CPU, skipped without torch). A backend registered without an entry here
+fails `test_every_backend_has_an_offline_config`. Backends that answer from prepared answers
+(`fake`, the mock server) return exactly `ANSWER`; the lower-bound baselines (D-109) compute a
+valid card_v2 answer for any request; a model (`hf_local`) answers with its own text.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,8 +33,10 @@ OFFLINE_CONFIGS: dict[str, dict[str, Any]] = {
     "openai_local": {"model_substring": "mistral", "expected_context": 4096},
     "baseline_empty": {},
     "baseline_rules": {},
+    "hf_local": {},  # filled from `tests.tiny_hf.hf_config()` in a fake project root
 }
 COMPUTES_ANSWERS = {"baseline_empty", "baseline_rules"}
+MODELS = {"hf_local"}  # answer any request with generated text
 
 
 def _mock_lmstudio(request: httpx.Request) -> httpx.Response:
@@ -60,8 +64,30 @@ def request(*messages: Message) -> GenerationRequest:
     return GenerationRequest(messages=list(messages), max_tokens=64, temperature=0.0)
 
 
+@pytest.fixture
+def model_root(request: pytest.FixtureRequest, tmp_path: Path,
+               monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+    """A fake project root with the tiny base model, for backends that load a model."""
+    if request.node.callspec.params.get("name") not in MODELS:
+        return
+    pytest.importorskip("torch")
+    pytest.importorskip("transformers")
+    pytest.importorskip("peft")
+    from tests.tiny_hf import tiny_base
+
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "quattro-formaggi"\n',
+                                             encoding="utf-8")  # fmt: skip
+    monkeypatch.setenv("QF_PROJECT_ROOT", str(tmp_path))
+    tiny_base(tmp_path)
+
+
 def backend(name: str) -> GenerationBackend:
-    instance = build(BACKENDS, ComponentConfig(name=name, **OFFLINE_CONFIGS[name]))
+    params = OFFLINE_CONFIGS[name]
+    if name in MODELS:
+        from tests.tiny_hf import hf_config
+
+        params = hf_config()
+    instance = build(BACKENDS, ComponentConfig(name=name, **params))
     assert isinstance(instance, GenerationBackend)
     return instance
 
@@ -71,6 +97,7 @@ def test_every_backend_has_an_offline_config() -> None:
 
 
 @pytest.mark.parametrize("name", BACKENDS.names())
+@pytest.mark.usefixtures("model_root")
 def test_backend_answers_system_and_user(name: str) -> None:
     impl = backend(name)
     assert impl.name == name
@@ -81,14 +108,17 @@ def test_backend_answers_system_and_user(name: str) -> None:
     assert result.ok and result.latency_s >= 0
     if name in COMPUTES_ANSWERS:
         get_target_schema("card_v2").parse(result.text)  # a strictly valid answer
+    elif name in MODELS:
+        assert isinstance(result.text, str) and result.completion_tokens
     else:
         assert result.text == ANSWER
 
 
 @pytest.mark.parametrize("name", BACKENDS.names())
+@pytest.mark.usefixtures("model_root")
 def test_backend_errors_are_results_not_exceptions(name: str) -> None:
     impl = backend(name)
-    if name not in COMPUTES_ANSWERS:  # a baseline answers any request
+    if name not in COMPUTES_ANSWERS | MODELS:  # a baseline or a model answers any request
         unknown = impl.generate(request(Message(role="user", content="no prepared answer")))
         assert isinstance(unknown, GenerationResult) and unknown.error
     # a request ending with the assistant answer is never sent on: it is refused
