@@ -20,6 +20,7 @@ from qf.contracts.evaluation import CaseScore, MetricValue
 from qf.contracts.facts import LoadFacts
 from qf.contracts.facts_v2 import AnyLoadFacts
 from qf.contracts.generation import GenerationRequest, GenerationResult
+from qf.contracts.models import ModelRef
 from qf.contracts.records import Language, SFTRecord
 from qf.contracts.rendering import RenderedRequest, RequestDraft
 from qf.contracts.training import Estimate, TokenStats, TrainConfig
@@ -30,6 +31,7 @@ __all__ = [
     "FactsBuilder",
     "GenerationBackend",
     "HardCase",
+    "Merger",
     "Metric",
     "RawSource",
     "Splitter",
@@ -140,6 +142,22 @@ class BatchGenerationBackend(GenerationBackend, Protocol):
 
     def generate_batch(self, reqs: Sequence[GenerationRequest]) -> list[GenerationResult]:
         """One result per request, in order; failures go to each `result.error`."""
+        ...
+
+
+@runtime_checkable
+class Merger(Protocol):
+    """Base model + LoRA adapter -> full weights in HF format (step 16). The base's local files,
+    dtype and device are the implementation's `Config`."""
+
+    @property
+    def name(self) -> str: ...
+
+    def merge(self, base: ModelRef, adapter: ArtifactRef, out: Path, *,
+              run_id: str) -> ArtifactRef:  # fmt: skip
+        """An `hf_model` artifact in `out` (relative to the project root): merged weights, the
+        base's tokenizer files unchanged and `qf_export_manifest.json`; refuses an adapter of
+        another base and a merge that changes nothing."""
         ...
 
 

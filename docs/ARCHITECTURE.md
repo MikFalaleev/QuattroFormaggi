@@ -143,7 +143,7 @@ flowchart BT
 | `GenerationBackend` | `name`; `model_id() -> str`; `generate(req: GenerationRequest) -> GenerationResult` | `fake`, `openai_local`, `hf_local` (шаги 9, 10, 14) | Ollama, vLLM, MLX |
 | `BatchGenerationBackend` (расширяет `GenerationBackend`, шаг 14, D-120) | `batch_size`; `generate_batch(reqs) -> list[GenerationResult]` — по результату на запрос, по порядку; ответы не зависят от пакета | `hf_local` | vLLM |
 | `AdapterTrainer` | `estimate(cfg: TrainConfig, token_stats: TokenStats, measured_tokens_per_s: float\|None) -> Estimate`; `train(cfg, train: ArtifactRef, val: ArtifactRef, run_dir, resume: Path\|None) -> ArtifactRef` (kind=`lora_adapter`) | `hf_trainer_qlora` (шаг 12) | TRL, MLX LoRA на Mac, Unsloth |
-| `Merger` | `merge(base: ModelRef, adapter: ArtifactRef, out: Path) -> ArtifactRef` (kind=`hf_model`) | `peft_merge` (шаг 16) | — |
+| `Merger` | `name`; `merge(base: ModelRef, adapter: ArtifactRef, out: Path, *, run_id: str) -> ArtifactRef` (kind=`hf_model`) | `peft_merge` (шаг 16) | — |
 | `ModelConverter` | `convert(model: ArtifactRef, out: Path, outtype: str) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_convert` (шаг 17) | MLX-формат |
 | `Quantizer` | `quantize(gguf: ArtifactRef, qtype: str, out: Path) -> ArtifactRef` | `llama_cpp_quantize` (шаг 17) | другие схемы квантования |
 
@@ -313,6 +313,7 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `openai_local` (LM Studio / llama-server по OpenAI-совместимому API, только адреса этого компьютера) | `qf.backends.openai_local:OpenAILocalBackend` | 10 | нет (лёгкая: httpx) |
 | `GenerationBackend`, `BatchGenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `hf_local` (HF transformers: закреплённая база в 4 бит, как при обучении, с адаптером LoRA или без; жадная генерация пакетами по `batch_size`, D-120) | `qf.backends.hf_local:HFLocalBackend` | 14 | да (лениво: torch, transformers, peft; 4 бит — bitsandbytes и CUDA; extra `train-cuda`) |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `baseline_empty` (пустая карточка — нижняя граница, не модель), `baseline_rules` (извлекатель на регулярных выражениях — нижняя граница, не модель) | `qf.baselines.backends:EmptyBaseline`, `qf.baselines.backends:RulesBaseline` | 10 (D-109) | нет |
+| `Merger` | `MERGERS` (`qf.export`, kind `merger`) | `peft_merge` (адаптер вливается в базу полной точности через PEFT `merge_and_unload(safe_merge=True)`; «пустое» слияние отклоняется; файлы токенизатора — байт в байт от базы; D-122) | `qf.export.mergers.peft_merge:PeftMerger` | 16 | да (лениво: torch, transformers, peft; extra `train-cuda`) |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.origin`, `field_accuracy.destination`, `field_accuracy.pickup_date`, `field_accuracy.delivery_date`, `field_accuracy.equipment_type`, `field_accuracy.cargo_category`, `field_accuracy.pieces`, `field_accuracy.weight_total`, `field_accuracy.weight_per_piece`, `field_accuracy.temperature_c`, `field_accuracy.shipper_name` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
@@ -397,6 +398,13 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Второй слой композиции рядом с CLI: `qf/cli/webui/` (логика `app.py`, HTTP `server.py` на `http.server`, страница `static/index.html`). Как и команды CLI, он импортирует стадии (`qf.data`, `qf.eval`) и домен, а стадии о нём не знают. Своих реестров и портов нет: оценка берётся из `SCORERS`, генерация — из `render_record`.
 - Сервер слушает только адреса этого компьютера и ничего не пишет в проект.
+
+## Реализация шага 16: отличия от текста Части C
+
+- Порт `Merger` получил `name` и именованный `run_id` (продюсер артефакта `hf_model`); база берётся из конфига реализации (`base_dir` — локальные файлы), а `ModelRef` в сигнатуре сверяется с ним и с закреплённой базой.
+- Файлы токенизатора и `generation_config.json` копируются из базы байт в байт после `save_pretrained`, а не сохраняются через `tok.save_pretrained`: transformers 5 может переписать `tokenizer_config.json` (D-122). Равенство `tokenizer_hash` и `chat_template_hash` исходным выполняется по построению и проверяется хэшами файлов.
+- Проверка слитой модели — `qf.export.verify`: по файлам (`verify_merged_files`, без torch — для копии на Mac) и с моделями (`verify_merged`, torch и peft импортируются внутри функций). Модели загружаются по очереди, не вместе.
+- `hf_local` принимает слитый пакет как `base_dir`: проверяет его по манифесту и называет по хэшу в `model_id` — оценка слитой модели не путается с оценкой базы.
 
 ## Реализация шага 15: отличия от текста Части C
 

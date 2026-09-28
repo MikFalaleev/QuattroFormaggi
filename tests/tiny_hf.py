@@ -38,16 +38,23 @@ def tiny_base(root: Path) -> Path:
     return TINY_BASE
 
 
-def tiny_adapter(root: Path, *, loader: str = "tiny_random_cpu", **manifest: Any) -> Path:
-    """A LoRA adapter with non-zero weights (it changes the answers) and its manifests."""
+def tiny_adapter(root: Path, *, loader: str = "tiny_random_cpu", zero: bool = False,
+                 **manifest: Any) -> Path:  # fmt: skip
+    """A LoRA adapter with non-zero weights (it changes the answers; `zero`: PEFT's initial
+    all-zero `lora_B`) and its manifests, named as `qf train run` names them."""
     model = MistralForCausalLM.from_pretrained(root / TINY_BASE)
     torch.manual_seed(1)
     lora = LoraConfig(r=4, lora_alpha=8, target_modules=["q_proj", "v_proj"],
-                      init_lora_weights=False)  # fmt: skip
+                      init_lora_weights=zero)  # fmt: skip
     directory = root / ADAPTER
     get_peft_model(model, lora).save_pretrained(directory)
+    config_path = directory / "adapter_config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config |= {"base_model_name_or_path": TINY_ID, "revision": REVISION}  # as name_base_model
+    config_path.write_text(json.dumps(config), encoding="utf-8")
     own = {"base_model": TINY_ID, "revision": REVISION, "loader": loader,
-           "quantization": "none (fp32)", **manifest}  # fmt: skip
+           "quantization": "none (fp32)", "run_id": directory.parent.name,
+           "experiment_id": None, "seed": 1, "global_step": 1, **manifest}  # fmt: skip
     (directory / "qf_adapter_manifest.json").write_text(json.dumps(own), encoding="utf-8")
     write_artifact(directory, "lora_adapter", "peft_lora_v1", directory.parent.name, root=root)
     return ADAPTER

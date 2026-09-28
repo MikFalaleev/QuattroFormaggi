@@ -7,7 +7,9 @@ with the same `fix_mistral_regex`; batches are left-padded with the `<pad>` toke
 vocabulary (never a new token). Only the new tokens are decoded. Requests are answered in
 batches of `batch_size` (the `BatchGenerationBackend` port); `latency_s` is the batch time
 divided by its requests. An adapter is refused if its own manifest names another base model,
-revision or quantization, or the loader of the CPU rehearsal (a tiny random model).
+revision or quantization, or the loader of the CPU rehearsal (a tiny random model). A merged
+package of step 16 (`base_dir` with `qf_export_manifest.json`) is verified against its artifact
+manifest on load, and its sha256 goes into `model_id` (D-122).
 
 Registered lazily in `cli.wiring` (needs torch, transformers, peft; 4-bit loading also
 bitsandbytes and CUDA).
@@ -30,6 +32,8 @@ from qf.contracts import GenerationRequest, GenerationResult, supported_versions
 __all__ = ["ADAPTER_MANIFEST", "TRAINED_LOADER", "HFLocalBackend"]
 
 ADAPTER_MANIFEST: Final = "qf_adapter_manifest.json"
+EXPORT_MANIFEST: Final = "qf_export_manifest.json"
+"""Written into a merged package by `qf export merge` (step 16)."""
 """Written into the adapter directory by `qf train run` (base, revision, loader, quantization)."""
 TRAINED_LOADER: Final = "cuda_4bit"
 """The loader of real training; `tiny_random_cpu` adapters come from the CPU rehearsal."""
@@ -87,6 +91,11 @@ class HFLocalBackend:
         root = project_root()
         base_dir = root / cfg.base_dir
         self._adapter_sha: str | None = None
+        self._merged_sha: str | None = None
+        if (base_dir / EXPORT_MANIFEST).is_file():  # a merged package: its hash names the model
+            merged = read_artifact(cfg.base_dir, "hf_model", supported_versions("hf_model"),
+                                   root=root)  # fmt: skip
+            self._merged_sha = merged.sha256
         adapter_dir = None
         if cfg.adapter is not None:
             ref = read_artifact(cfg.adapter, "lora_adapter", supported_versions("lora_adapter"),
@@ -153,8 +162,8 @@ class HFLocalBackend:
         else:
             if self.cfg.device == "cuda" and not torch.cuda.is_available():
                 raise QFError("device cuda requested, but CUDA is not available")
-            model = AutoModelForCausalLM.from_pretrained(str(base_dir), **common)
-            model = model.to(self.cfg.device)
+            placement = {"device_map": {"": 0}} if self.cfg.device == "cuda" else {}
+            model = AutoModelForCausalLM.from_pretrained(str(base_dir), **common, **placement)
         if adapter_dir is not None:
             from peft import PeftModel
 
@@ -177,6 +186,8 @@ class HFLocalBackend:
                      f"-{self.cfg.compute_dtype}" if self.cfg.load_in_4bit
                      else self.cfg.compute_dtype)  # fmt: skip
         model = f"{self.cfg.base_id}@{self.cfg.revision[:12]} {precision}"
+        if self._merged_sha is not None:
+            model = f"merged {self._merged_sha[:12]} of {model}"
         return model if self._adapter_sha is None else f"{model} + lora {self._adapter_sha[:12]}"
 
     def generate(self, req: GenerationRequest) -> GenerationResult:

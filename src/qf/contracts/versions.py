@@ -29,6 +29,7 @@ SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "benchmark": frozenset({"sft_record_v1"}),  # step 7 reads it, step 8 writes it
     "predictions": frozenset({"predictions_v1"}),  # step 9
     "lora_adapter": frozenset({"peft_lora_v1"}),  # step 12
+    "hf_model": frozenset({"hf_safetensors_v1"}),  # step 16: merged weights
 }
 
 

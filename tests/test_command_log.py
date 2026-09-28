@@ -17,11 +17,11 @@ def lines(path: Path) -> list[dict[str, object]]:
 
 
 def test_every_command_is_logged(tmp_path: Path) -> None:
-    assert main(["export", "merge"]) == 2
+    assert main(["export", "gguf"]) == 2
     assert main(["train", "fetch-base"]) == 1  # refused: still logged
     logged = lines(tmp_path / "commands.jsonl")
     assert [(entry["argv"], entry["exit_code"]) for entry in logged] == [
-        (["export", "merge"], 2),
+        (["export", "gguf"], 2),
         (["train", "fetch-base"], 1),
     ]
     assert all(entry["machine"] and entry["seconds"] >= 0 for entry in logged)

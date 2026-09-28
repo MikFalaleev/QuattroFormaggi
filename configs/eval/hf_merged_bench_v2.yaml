@@ -1,0 +1,81 @@
+# Step 16 (D-122): the merged model (seed-42 adapter merged into the bf16 base) on bench_v2, HF transformers
+# on the GPU machine, bf16 without quantization, greedy, without a JSON schema. Compared with the seed-42 4-bit
+# adapter run within HF, no threshold; NOT the П5 reference (that is the BF16 GGUF of the same llama.cpp, step 17).
+# Run on committed code, in tmux:
+#   uv run qf eval run --config configs/eval/hf_merged_bench_v2.yaml
+name: hf_merged_bench_v2
+backend:
+  name: hf_local
+  base_id: mistralai/Mistral-Nemo-Instruct-2407
+  revision: 04d8a90549d23fc6bd7f642064003592df51e9b3
+  base_dir: artifacts/merged/Quattro-Formaggi-12B-Logistics-v0.1   # verified against its manifest on load
+  fix_mistral_regex: true
+  load_in_4bit: false     # merged bf16 weights, no quantization
+  compute_dtype: bf16
+  attn_implementation: sdpa
+  device: cuda
+  batch_size: 64          # the same for every run of the comparison; measured on the H100 NVL (D-120)
+bench:
+  path: data/splits_v2/bench_v2.jsonl
+  sha256: 964c5c157d800648192ad6624cbb782d81c5329772b5fdfc5229c9f80d684b59
+generation:
+  max_tokens: 768
+  temperature: 0.0
+metrics:
+  - json_valid_rate
+  - lenient_parse_rate
+  - failed_output_rate
+  - key_field_accuracy
+  - field_accuracy_micro
+  - field_accuracy.origin
+  - field_accuracy.destination
+  - field_accuracy.pickup_date
+  - field_accuracy.delivery_date
+  - field_accuracy.equipment_type
+  - field_accuracy.cargo_category
+  - field_accuracy.pieces
+  - field_accuracy.weight_total
+  - field_accuracy.weight_per_piece
+  - field_accuracy.shipper_name
+  - field_accuracy.special_conditions
+  - special_conditions_exact_rate
+  - field_accuracy.special_conditions.temperature
+  - field_accuracy.special_conditions.securing
+  - field_accuracy.special_conditions.packaging
+  - field_accuracy.special_conditions.oversize
+  - field_accuracy.special_conditions.sensors
+  - condition_precision
+  - condition_recall
+  - condition_precision.temperature
+  - condition_precision.securing
+  - condition_precision.packaging
+  - condition_precision.oversize
+  - condition_precision.sensors
+  - condition_recall.temperature
+  - condition_recall.securing
+  - condition_recall.packaging
+  - condition_recall.oversize
+  - condition_recall.sensors
+  - missing_f1
+  - missing_exact_rate
+  - conflict_recall
+  - hallucination_rate
+  - critical_error_count
+  - critical_error_count.pieces_weight_swap
+  - critical_error_count.wrong_unit_magnitude
+  - critical_error_count.origin_destination_swap
+  - critical_error_count.hallucinated_required_field
+  - critical_error_count.missed_conflict
+  - critical_error_count.hallucinated_condition
+  - critical_error_count.missed_condition
+slice_metrics:
+  - json_valid_rate
+  - key_field_accuracy
+  - field_accuracy_micro
+  - special_conditions_exact_rate
+  - condition_precision
+  - condition_recall
+  - missing_f1
+  - conflict_recall
+  - hallucination_rate
+  - critical_error_count

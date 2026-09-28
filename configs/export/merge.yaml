@@ -1,0 +1,19 @@
+# Step 16 (D-122): the accepted adapter merged into the full-precision base, on the GPU machine
+# (the Mac has 36 GB of RAM; the plan asks for 48–64 GB). Run on committed code, in tmux:
+#   uv run qf export merge --adapter artifacts/adapters/qf-12b-logistics-v0.1-seed42
+#   uv run qf export verify --merged artifacts/merged/Quattro-Formaggi-12B-Logistics-v0.1
+# and on the Mac copy: `qf export verify --merged … --files-only`.
+merger:
+  name: peft_merge
+  base_id: mistralai/Mistral-Nemo-Instruct-2407
+  revision: 04d8a90549d23fc6bd7f642064003592df51e9b3
+  base_dir: artifacts/base_model/mistralai--Mistral-Nemo-Instruct-2407/04d8a90549d23fc6bd7f642064003592df51e9b3
+  dtype: bf16
+  device: cuda
+  max_shard_size: 5GB
+  # copied byte for byte from the base (tokenizer_files of base_model.yaml without config.json)
+  tokenizer_files: [tokenizer.json, tokenizer_config.json, special_tokens_map.json]
+verify:
+  bench: data/splits_v2/bench_v2.jsonl  # the first 5 records: system + user only
+  prompts: 5
+  max_new_tokens: 32
