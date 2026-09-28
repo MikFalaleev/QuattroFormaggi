@@ -6,7 +6,7 @@ title: GPU smoke run of the QLoRA pipeline (plan step 13)
 registered: 2026-09-25
 plan_step: "13"
 question: >-
-  Does the QLoRA pipeline run on the rented GPU (1x A100 80 GB) as it did on CPU, and how much
+  Does the QLoRA pipeline run on the rented GPU (1x H100 NVL 94 GB; registered for A100, see notes) as it did on CPU, and how much
   memory and time does a real optimizer step take?
 hypotheses:
   - "H1: exactly 57,016,320 trainable LoRA parameters (r=16, 7 modules, 40 layers)."
@@ -18,6 +18,12 @@ success: >-
   H1 exact, no NaN or out-of-memory, H5 works. H2 and H3 are measurements that replace the
   assumptions of the estimate (E300); a result outside the range is recorded, not a failure.
 config: configs/train/qlora_nemo_v0.1_smoke.yaml
-config_sha256: c731cbc4c9b73e2f1c11fd68603ed24c46881faf26fdaf84c1c3930219ca2a33
+config_sha256: e1cac6e64095953fd408585d586404929301e8c5e0f2d1c36ff8ee9f2982fa27
 seeds: [42]
 requires_approval: true
+notes: >-
+  Amended 2026-09-28, before any run (D-119): the user rented 1x H100 NVL 94 GB
+  (h100nvl-1.16.96.240, 368.18 RUB/h with the IP) instead of 1x A100 80 GB (231.17 RUB/h).
+  Only the budget changed: gpu_hourly_rate and max_cost (200 -> 250 RUB; 40 min x 368.18 = 245.45); the time limit and every
+  training parameter are as registered, so config_sha256 was recomputed. Hypotheses are
+  unchanged: the memory and speed ranges were derived for A100.

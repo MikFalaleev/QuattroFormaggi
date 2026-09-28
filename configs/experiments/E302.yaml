@@ -17,6 +17,13 @@ success: >-
   H1 and H4. Quality against the release gates (D-112) is decided only by the evaluation of
   step 14, not by the loss or the samples.
 config: configs/train/qlora_nemo_v0.1.yaml
-config_sha256: 4cd9ccf864b6bf0bc64a0efcc688e1362a7828a446fade958b7c775a955f0270
+config_sha256: 376cd4b4c3cc02898cbff625fdad1ee6b8eaacd43309d922205f9e2fa4a205db
 seeds: [42, 43, 44]  # 42 is the pilot; 43 and 44 only if time and balance allow (decided after 42)
 requires_approval: true
+notes: >-
+  Amended 2026-09-28, before any run (D-119): the user rented 1x H100 NVL 94 GB
+  (h100nvl-1.16.96.240, 368.18 RUB/h with the IP) instead of 1x A100 80 GB (231.17 RUB/h).
+  Only the budget changed: gpu_hourly_rate and max_cost (500 -> 740 RUB; 120 min x 368.18 = 736.36); the time limit and every
+  training parameter are as registered, so config_sha256 was recomputed. Hypotheses are
+  unchanged: the memory and speed ranges were derived for A100.
+  H1 still predicts at most 500 RUB for the training loop at the new rate.

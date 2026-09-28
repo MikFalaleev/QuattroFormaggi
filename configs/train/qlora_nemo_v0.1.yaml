@@ -15,7 +15,7 @@ quantization:
   load_in_4bit: true
   type: nf4
   double_quant: true
-  # an explicit choice (never "bfloat16_if_supported"): A100 supports bf16; confirmed on the
+  # an explicit choice (never "bfloat16_if_supported"): A100 and H100 support bf16; confirmed on the
   # machine by test_gpu_bf16_decision at step 13
   compute_dtype: bf16
 lora:
@@ -53,9 +53,9 @@ logging:
   external_reporting: false
   record_peak_memory: true
 budget:
-  gpu_hourly_rate: 231.17            # Immers.cloud, 1× A100 80 GB, per-second billing (25.09.2026)
+  gpu_hourly_rate: 368.18            # Immers.cloud h100nvl-1.16.96.240 + IP, per-second billing (28.09.2026, D-119)
   measured_tokens_per_s: null        # measured by the GPU smoke run (step 13)
-  max_cost: 500                      # the training loop only; proposal, the user confirms
+  max_cost: 740                      # the training loop only: 120 min × 368.18 = 736.36 (D-119)
   currency: RUB
   overhead_factor: 1.3
 output:
