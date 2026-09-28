@@ -39,6 +39,7 @@ PLANNED_COMMANDS = {
     "train verify",
     "export merge",
     "export gguf",
+    "export adapter",  # the backup copy of step 15 (D-121)
     "export verify",
     "extract",
     "release check",

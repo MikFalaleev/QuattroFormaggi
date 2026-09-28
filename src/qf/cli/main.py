@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 
 from qf import __version__
 from qf.cli.command_log import list_runs, record_command
-from qf.cli.commands import bench, data, doctor, tokens, train, ui
+from qf.cli.commands import bench, data, doctor, export, tokens, train, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -187,7 +187,20 @@ _SPECS = (
         train.run_fetch_base,
         train.configure_fetch_base,
     ),
-    CommandSpec("export verify", "15", "verify adapter/merged artifacts against manifests"),
+    CommandSpec(
+        "export adapter",
+        "15",
+        "back up the accepted adapter to artifacts/adapters/<name>/ with its manifest (D-121)",
+        export.run_adapter,
+        export.configure_adapter,
+    ),
+    CommandSpec(
+        "export verify",
+        "15",
+        "verify an adapter (backup or run) against its manifests",
+        export.run_verify,
+        export.configure_verify,
+    ),
     CommandSpec("export merge", "16", "merge the adapter into full HF weights"),
     CommandSpec("export gguf", "17", "convert to GGUF and quantize"),
     CommandSpec("extract", "18", "extract a shipment card from a request"),
