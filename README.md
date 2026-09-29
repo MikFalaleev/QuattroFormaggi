@@ -2,16 +2,42 @@
 
 Воспроизводимый проект дообучения и оценки локальной языковой модели для логистики:
 
-- **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: запрос на перевозку → JSON-карточка груза (`card_v1`) + список недостающих полей; экспорт в GGUF для LM Studio.
-- **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля.
+- **QF-12B** — QLoRA-адаптер к `mistralai/Mistral-Nemo-Instruct-2407` для одного сценария v0.1: текст заявки на перевозку → JSON-карточка груза (`card_v2`: маршрут, даты, груз, масса, места, тип транспорта, особые условия) + список недостающих полей и противоречий; экспорт в GGUF для LM Studio.
+- **QF-Lab** — отдельный учебный трек: собственный Transformer ~100M параметров, обучение с нуля (ещё не начат).
 
-Статус: реализованы **шаги 1–9** (каркас, CLI, `qf doctor`, манифесты, архитектурные проверки; загрузка сырого датасета с provenance; профилирование и проверка целостности таблиц; контракт данных — схема карточки `card_v1`, формат SFT-записи, единицы, правило недостающих полей, российские города (замена американских городов датасета), реестр задач, см. `docs/DATA_SPEC.md`; факты о загрузках `load_facts.jsonl`; генератор учебных заявок и эталонных ответов `qf data build`; независимая проверка датасета `qf validate-data` и отчёт длин; эталонный набор `bench_v1` — проверен и заморожен, `qf bench …`; метрики, статистика и eval-harness `qf eval run` / `qf eval compare`, пока проверенные только на подставных ответах fake-backend'а). По решению пользователя до шага 10 карточка расширяется до `card_v2` — типы транспорта и особые условия (`docs/PLAN_card_v2.md`); реализованы подшаги V1 (контракт, правила и промпт v2), V2 (факты с транспортом и особыми условиями, `qf data facts-v2`), V3 (заявки v2: `qf data build --config configs/data/generate_v2.yaml` → `data/processed/generated_v2/`), V4 (проверка данных v2: `qf validate-data --data-dir data/processed/generated_v2`) V5 (`bench_v2` заморожен: 271 запись, из них 33 заявки-мока, настоящих заявок нет) и V6 (метрики и критические ошибки `card_v2`, `qf eval run` на `bench_v2`). Далее реализованы шаги 10–15: baseline исходной модели в LM Studio (E100), аудит токенизатора и маски обучения, обучение QLoRA с протоколом эксперимента (D-118), оценка адаптера генерацией в HF (`hf_local`, D-120) и резервная копия адаптера (D-121). **28.09.2026** на арендованной H100 NVL обучен адаптер (одна эпоха, три seed) и оценён на `bench_v2`: `key_field_accuracy` 0,95–0,97 против 0,014 у той же базы без дообучения; принят адаптер seed 42. Это результат в HF с базой в 4 бит — окончательная проверка порогов будет на GGUF в LM Studio (шаг 18). Слитых весов и GGUF пока нет.
+## Статус (29.09.2026)
+
+Реализованы **шаги 1–17** из `IMPLEMENTATION_PLAN.md`; впереди шаг 18 (команда `qf extract` и приёмка GGUF в LM Studio) и 19 (выпуск v0.1).
+
+- **Данные** (шаги 2–8, подшаги V1–V6): закреплённый табличный датасет `yogape/logistics-operations` (MIT) → факты о 85 410 загрузках с российскими городами → синтетические заявки по детерминированным шаблонам, эталоны вычисляет код (не LLM); `generated_v2`: 1 500 записей train / 150 val / 600 test / 300 test_ood; замороженный бенчмарк `bench_v2` — 271 запись, из них 33 заявки-макета, настоящих заявок нет.
+- **Оценка** (шаги 9–10): 26 метрик, критические ошибки, bootstrap-интервалы, McNemar; пороги релиза П1–П6 утверждены **до обучения** и не меняются (`docs/EVAL_SPEC.md`, D-112).
+- **Обучение** (шаги 11–13, протокол эксперимента D-118): QLoRA r=16 (0,46% параметров), одна эпоха, три seed на арендованной H100 NVL, ~24 мин и ~150 ₽ на seed.
+- **Экспорт** (шаги 14–17): оценка адаптера в HF, резервная копия, слияние в bf16 (побайтно воспроизводимо), GGUF закреплённым llama.cpp `42916d83` — тем же, что у движка LM Studio 0.4.25.
+
+**Результаты на `bench_v2`** (271 заявка, жадная генерация, без JSON-схемы):
+
+| модель | backend | key_field_accuracy | json_valid_rate | критических ошибок |
+|---|---|---|---|---|
+| правила на регулярных выражениях (нижняя граница) | — | 0,874 | 1,0 | — |
+| исходная база, GGUF Q4_K_M (E100) | LM Studio | 0,005 | 0,026 | — |
+| исходная база, 4 бит | HF | 0,014 | 0,063 | 14 |
+| адаптер seed 42 + база 4 бит (E303) | HF | 0,951 | 0,993 | 3 |
+| слитая модель bf16 (E304) | HF | 0,960 | 0,982 | 6 |
+| слитая модель, GGUF BF16 (E305) | llama.cpp | 0,951 | 0,978 | 7 |
+| **слитая модель, GGUF Q6_K — кандидат в релиз** | llama.cpp | **0,960** | **0,985** | **6** |
+| слитая модель, GGUF Q4_K_M | llama.cpp | 0,960 | 0,985 | 11 |
+
+- **П4** (+5 п. п. к базе в том же backend) — пройден с запасом ~94 п. п. в HF и в llama.cpp; окончательно — в LM Studio (шаг 18).
+- **П5** (потеря квантования к BF16-GGUF ≤ 2 п. п. и ни одной новой критической ошибки) — **не выполнен ни одним форматом**: по ключевым полям все в пределах ±1 п. п., но новых критических ошибок по заявкам — Q4_K_M 5, Q5_K_M 5, Q6_K 1, Q8_0 1. Кандидат в релиз — Q6_K; П5 остаётся «не выполнен» (D-124).
+- **Слабые места:** заявки-макеты, похожие на живые письма (key 0,67–0,82 в зависимости от seed и формата); незнакомый шаблон заявки (test_ood T7 — 0,86: «7 718кг» читается как 718 кг, сленг «борт», «реф»). Находки для следующей версии данных — `docs/TODO.md`.
+
+Все решения — `docs/DECISIONS.md` (D-012…D-124); журнал исследования и карточки экспериментов ведутся вне Git.
 
 Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TODO.md` (отложенные задачи и напоминания), `docs/PLAN_card_v2.md` (утверждённый план карточки `card_v2`: типы транспорта и особые условия, подшаги V1–V6 до шага 10), `AGENTS.md` (правила для coding agents).
 
 ## Быстрый старт
 
-Нужны `uv` и `git`. Python 3.11 uv установит сам.
+Нужны `uv` и `git`. Python 3.11 uv установит сам. Закреплённый llama.cpp (шаг 17) — git-подмодуль: `git clone --recurse-submodules …` или `git submodule update --init` в уже склонированном репозитории.
 
 ```bash
 uv sync --extra dev        # окружение разработки (без torch/CUDA)
@@ -41,7 +67,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 
 Ручная проверка в браузере (без модели; сервер только на этом компьютере): `uv run qf ui`, затем открыть http://127.0.0.1:8765/.
 
-Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); QLoRA-обучение — удалённая машина Linux + NVIDIA (≥24 GB VRAM). См. `docs/PROJECT.md`, раздел 4.
+Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); обучение QLoRA, оценка в HF, слияние и сборка GGUF — арендованная машина Linux + NVIDIA (использовалась 1× H100 NVL 94 ГБ). См. `docs/PROJECT.md`, раздел 4.
 
 ## Команды
 
@@ -57,7 +83,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf data split [--data-dir DIR]`, `qf data split --input FILE --out-dir DIR [--config PATH]` | 7 | реализована |
 | `qf data report [--data-dir DIR]` (`--tokenizer` — шаг 11) | 7 | реализована |
 | `qf bench export-review / import-review / freeze [--manual FILE] / verify` (`--config PATH`) | 8, V5 | реализованы; порядок — `docs/EVAL_SPEC.md`; для `card_v2` — `--config configs/eval/benchmark_v2.yaml` → `data/splits_v2/` |
-| `qf eval run --config PATH [--resume RUN_DIR]`, `qf eval compare RUN_A RUN_B` | 9, V6 | реализованы для `card_v1` и `card_v2` (backend `fake`; LM Studio — шаг 10); метрики — `docs/EVAL_SPEC.md` |
+| `qf eval run --config PATH [--resume RUN_DIR]`, `qf eval compare RUN_A RUN_B` | 9, V6 | реализованы для `card_v1` и `card_v2`; backends `fake`, `openai_local` (LM Studio / `llama-server`), `hf_local` (шаг 14); метрики — `docs/EVAL_SPEC.md` |
 | `qf ui [--port 8765]` | — | реализована: локальный веб-интерфейс для ручной проверки — заявки и эталоны, оценка ответа, генератор, отчёты прогонов (D-107) |
 | `qf eval-baseline --config PATH --json-schema on\|off [--resume RUN_DIR]` | 10 | реализована: baseline модели в LM Studio в одном из двух режимов (backend `openai_local`); нижняя граница — `qf eval run` с `configs/eval/baseline_{empty,rules}_v2.yaml` |
 | `qf tokens fetch [--config PATH]`, `qf tokens audit [--data DIR] [--max-len 2048]` | 11 | реализованы: файлы токенизатора закреплённой ревизии без весов; аудит маски обучения → `runs/<id>/mask_audit.md` (D-113) |
@@ -65,7 +91,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf eval run --config configs/eval/hf_*_v2.yaml` | 14 | реализована: оценка генерацией в HF на GPU-машине — база в 4 бит с адаптером или без, пакетами; целые `test`/`test_ood` (`bench.kind: sft_dataset`) (D-120) |
 | `qf export adapter runs/<id> --name NAME`, `qf export verify --adapter PATH` | 15 | реализованы: резервная копия принятого адаптера в `artifacts/adapters/<name>/` со своим манифестом и её проверка; копию вне компьютера делает пользователь (D-121) |
 | `qf export merge --adapter artifacts/adapters/<name> [--out DIR]`, `qf export verify --merged DIR [--files-only]` | 16 | реализованы: адаптер вливается в базу bf16 → `artifacts/merged/…` (HF safetensors, токенизатор базы без изменений, манифест с хэшами); проверка слитой модели против «база + адаптер» или только по файлам (D-122). Нужна машина с GPU и ≥48 ГБ RAM |
-| `qf export gguf --source DIR --name NAME [--qtypes Q4_K_M,Q5_K_M]`, `qf export verify --gguf FILE` | 17 | реализованы: HF-модель → GGUF BF16 → квантованные GGUF закреплённым llama.cpp (`third_party/llama.cpp` @42916d83 — как в LM Studio 0.4.25), метаданные сверяются с HF; качество — `qf eval run` против `llama-server` (`configs/eval/llamacpp_*`) (D-123) |
+| `qf export gguf --source DIR --name NAME [--qtypes Q4_K_M,Q5_K_M]`, `qf export verify --gguf FILE` | 17 | реализованы: HF-модель → GGUF BF16 → квантованные GGUF закреплённым llama.cpp (`third_party/llama.cpp` @42916d83 — как в LM Studio 0.4.25), метаданные сверяются с HF; качество — `qf eval run` против `llama-server` (`configs/eval/llamacpp_*`) (D-123, D-124) |
 | `qf extract` | 18 | не реализована |
 | `qf release check` | 19 | не реализована |
 | `qf lab …` | L1–L6 | не реализована |
@@ -79,12 +105,12 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy src/qf
 uv run lint-imports
-uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and not needs_tokenizer"
+uv run pytest -q -m "not slow and not gpu and not network and not lmstudio and not needs_tokenizer and not llama_server"
 uv run pytest --cov=qf --cov-report=term-missing   # покрытие ≥85% для лёгких пакетов
 ```
 
-Тесты с маркерами `network`, `gpu`, `lmstudio` без явного флага пропускаются: `--run-network` (скачивает данные — только с разрешения), `--run-gpu`, `--run-lmstudio`.
+Тесты с маркерами `network`, `gpu`, `lmstudio`, `llama_server` без явного флага пропускаются: `--run-network` (скачивает данные — только с разрешения), `--run-gpu`, `--run-lmstudio`, `--run-llama-server` (ворота шага 17 с запущенным `llama-server`).
 
 ## Данные и веса
 
-Каталоги `data/`, `artifacts/`, `runs/` и файлы весов (`*.gguf`, `*.safetensors`, `*.bin`) не хранятся в Git. Ничего не загружается во внешние сервисы автоматически.
+Каталоги `data/`, `artifacts/` (`adapters/`, `merged/`, `gguf/`, `base_model/`), `runs/`, venv конвертера `.venv-convert/`, сборка `third_party/llama.cpp-build/` и файлы весов (`*.gguf`, `*.safetensors`, `*.bin`) не хранятся в Git. Ничего не загружается во внешние сервисы автоматически; веса модели и GGUF публикуются только решением человека (шаг 19).
