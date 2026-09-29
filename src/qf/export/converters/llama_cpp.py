@@ -76,7 +76,9 @@ def run_tool(args: Sequence[str], log: Path, *, env: dict[str, str] | None = Non
     """Run an external tool; its output goes to `log`; failure -> `QFError` with stderr tail."""
     log.parent.mkdir(parents=True, exist_ok=True)
     try:
-        result = subprocess.run(list(args), check=True, capture_output=True, text=True, env=env)
+        # tool logs are not always UTF-8 (llama-quantize prints raw token bytes): never fail on them
+        result = subprocess.run(list(args), check=True, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", env=env)  # fmt: skip
     except subprocess.CalledProcessError as exc:
         log.write_text(f"$ {' '.join(args)}\n{exc.stdout or ''}\n--- stderr ---\n"
                        f"{exc.stderr or ''}", encoding="utf-8")  # fmt: skip

@@ -226,3 +226,12 @@ def test_gguf_source_must_be_merged_or_the_pinned_base(fake_project: Path) -> No
     gguf_config(fake_project)
     (fake_project / "somewhere").mkdir()
     assert main(["export", "gguf", "--source", "somewhere", "--name", "t"]) == 1
+
+
+def test_tool_output_that_is_not_utf8_does_not_fail(tmp_path: Path) -> None:
+    """llama-quantize prints raw token bytes: a real subprocess with invalid UTF-8 output."""
+    noisy = (
+        "import sys; sys.stdout.buffer.write(b'tensor \\xc4 ok'); sys.stderr.buffer.write(b'\\xff')"
+    )
+    llama_cpp.run_tool([sys.executable, "-c", noisy], tmp_path / "tool.log")
+    assert "tensor" in (tmp_path / "tool.log").read_text(encoding="utf-8")
