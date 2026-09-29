@@ -66,6 +66,8 @@ module-name = "qf"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# the pinned llama.cpp submodule (step 17) is third-party code: never linted or formatted here
+extend-exclude = ["third_party"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
@@ -88,6 +90,7 @@ markers = [
     "needs_tokenizer: needs locally downloaded Mistral-Nemo tokenizer files",
     "gpu: needs CUDA; run only on the remote GPU machine",
     "lmstudio: needs a running LM Studio server",
+    "llama_server: needs a running llama-server of the pinned llama.cpp at 127.0.0.1:8081 (step 17)",
 ]
 
 [tool.coverage.run]

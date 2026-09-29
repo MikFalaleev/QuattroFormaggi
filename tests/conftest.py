@@ -30,6 +30,7 @@ OPT_IN_MARKERS = {
     "network": "--run-network",
     "gpu": "--run-gpu",
     "lmstudio": "--run-lmstudio",
+    "llama_server": "--run-llama-server",
 }
 
 

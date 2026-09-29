@@ -33,6 +33,8 @@ __all__ = [
     "HardCase",
     "Merger",
     "Metric",
+    "ModelConverter",
+    "Quantizer",
     "RawSource",
     "Splitter",
     "TemplateFamily",
@@ -158,6 +160,33 @@ class Merger(Protocol):
         """An `hf_model` artifact in `out` (relative to the project root): merged weights, the
         base's tokenizer files unchanged and `qf_export_manifest.json`; refuses an adapter of
         another base and a merge that changes nothing."""
+        ...
+
+
+@runtime_checkable
+class ModelConverter(Protocol):
+    """An HF model directory -> one GGUF file (step 17). The tool, its pinned version and paths
+    are the implementation's `Config`."""
+
+    @property
+    def name(self) -> str: ...
+
+    def convert(self, source: Path, out: Path, *, outtype: str, run_id: str,
+                parents: Sequence[str]) -> ArtifactRef:  # fmt: skip
+        """A `gguf` artifact at `out` (relative to the project root) made from `source`."""
+        ...
+
+
+@runtime_checkable
+class Quantizer(Protocol):
+    """A GGUF file -> a quantized GGUF file (step 17), with the same pinned tool version."""
+
+    @property
+    def name(self) -> str: ...
+
+    def quantize(self, source: ArtifactRef, out: Path, *, qtype: str,
+                 run_id: str) -> ArtifactRef:  # fmt: skip
+        """A `gguf` artifact at `out` quantized to `qtype` (e.g. Q4_K_M) from `source`."""
         ...
 
 

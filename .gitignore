@@ -33,3 +33,5 @@ build/
 CLAUDE.md
 CLAUDE.local.md
 .claude/
+# llama.cpp build outside the submodule (step 17): keeps the submodule clean
+/third_party/llama.cpp-build/

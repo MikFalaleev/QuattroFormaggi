@@ -1,0 +1,24 @@
+# Step 17 (D-123): GGUF files with the pinned llama.cpp (the commit of LM Studio 0.4.25's engine,
+# chosen by the user on 2026-09-29). On the GPU machine, in tmux, on committed code:
+#   uv run qf export gguf --source artifacts/merged/Quattro-Formaggi-12B-Logistics-v0.1 \
+#       --name Quattro-Formaggi-12B-Logistics-v0.1 --qtypes Q4_K_M,Q5_K_M
+#   uv run qf export gguf --source artifacts/base_model/mistralai--Mistral-Nemo-Instruct-2407/04d8a90549d23fc6bd7f642064003592df51e9b3 \
+#       --name Mistral-Nemo-Instruct-2407-04d8a90549d2 --qtypes Q4_K_M
+# Converter venv: uv venv --python 3.11 .venv-convert &&
+#   uv pip install --python .venv-convert -r third_party/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt
+# Build (outside the submodule, keeps it clean): cmake -S third_party/llama.cpp -B third_party/llama.cpp-build
+#   -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=90 -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
+#   && cmake --build third_party/llama.cpp-build --target llama-quantize llama-server -j
+converter:
+  name: llama_cpp_convert
+  llama_cpp_dir: third_party/llama.cpp
+  commit: 42916d83f4a225e56709f873aa8050ac11f5b6a4
+  python: .venv-convert/bin/python
+quantizer:
+  name: llama_cpp_quantize
+  llama_cpp_dir: third_party/llama.cpp
+  commit: 42916d83f4a225e56709f873aa8050ac11f5b6a4
+  quantize_bin: third_party/llama.cpp-build/bin/llama-quantize
+gguf_py: third_party/llama.cpp/gguf-py
+outtype: bf16
+out_dir: artifacts/gguf

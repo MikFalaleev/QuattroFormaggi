@@ -30,6 +30,7 @@ SUPPORTED_SCHEMA_VERSIONS: dict[str, frozenset[str]] = {
     "predictions": frozenset({"predictions_v1"}),  # step 9
     "lora_adapter": frozenset({"peft_lora_v1"}),  # step 12
     "hf_model": frozenset({"hf_safetensors_v1"}),  # step 16: merged weights
+    "gguf": frozenset({"gguf_v3"}),  # step 17: llama.cpp GGUF files
 }
 
 

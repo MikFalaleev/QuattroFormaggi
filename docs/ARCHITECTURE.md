@@ -144,8 +144,8 @@ flowchart BT
 | `BatchGenerationBackend` (расширяет `GenerationBackend`, шаг 14, D-120) | `batch_size`; `generate_batch(reqs) -> list[GenerationResult]` — по результату на запрос, по порядку; ответы не зависят от пакета | `hf_local` | vLLM |
 | `AdapterTrainer` | `estimate(cfg: TrainConfig, token_stats: TokenStats, measured_tokens_per_s: float\|None) -> Estimate`; `train(cfg, train: ArtifactRef, val: ArtifactRef, run_dir, resume: Path\|None) -> ArtifactRef` (kind=`lora_adapter`) | `hf_trainer_qlora` (шаг 12) | TRL, MLX LoRA на Mac, Unsloth |
 | `Merger` | `name`; `merge(base: ModelRef, adapter: ArtifactRef, out: Path, *, run_id: str) -> ArtifactRef` (kind=`hf_model`) | `peft_merge` (шаг 16) | — |
-| `ModelConverter` | `convert(model: ArtifactRef, out: Path, outtype: str) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_convert` (шаг 17) | MLX-формат |
-| `Quantizer` | `quantize(gguf: ArtifactRef, qtype: str, out: Path) -> ArtifactRef` | `llama_cpp_quantize` (шаг 17) | другие схемы квантования |
+| `ModelConverter` | `name`; `convert(source: Path, out: Path, *, outtype: str, run_id: str, parents: Sequence[str]) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_convert` (шаг 17) | MLX-формат |
+| `Quantizer` | `name`; `quantize(source: ArtifactRef, out: Path, *, qtype: str, run_id: str) -> ArtifactRef` (kind=`gguf`) | `llama_cpp_quantize` (шаг 17) | другие схемы квантования |
 
 Порт `Retriever` для будущего RAG в v0.1 **не объявляется**: он появится вместе с первой реализацией в отдельном плане (C.9). `Splitter` и `RawSource` получают `cfg` как `Mapping[str, Any]` — параметры своей реализации (C.5).
 
@@ -314,6 +314,8 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 | `GenerationBackend`, `BatchGenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `hf_local` (HF transformers: закреплённая база в 4 бит, как при обучении, с адаптером LoRA или без; жадная генерация пакетами по `batch_size`, D-120) | `qf.backends.hf_local:HFLocalBackend` | 14 | да (лениво: torch, transformers, peft; 4 бит — bitsandbytes и CUDA; extra `train-cuda`) |
 | `GenerationBackend` | `BACKENDS` (`qf.backends`, kind `backend`) | `baseline_empty` (пустая карточка — нижняя граница, не модель), `baseline_rules` (извлекатель на регулярных выражениях — нижняя граница, не модель) | `qf.baselines.backends:EmptyBaseline`, `qf.baselines.backends:RulesBaseline` | 10 (D-109) | нет |
 | `Merger` | `MERGERS` (`qf.export`, kind `merger`) | `peft_merge` (адаптер вливается в базу полной точности через PEFT `merge_and_unload(safe_merge=True)`; «пустое» слияние отклоняется; файлы токенизатора — байт в байт от базы; D-122) | `qf.export.mergers.peft_merge:PeftMerger` | 16 | да (лениво: torch, transformers, peft; extra `train-cuda`) |
+| `ModelConverter` | `CONVERTERS` (`qf.export`, kind `converter`) | `llama_cpp_convert` (`convert_hf_to_gguf.py` закреплённого llama.cpp в своём venv `.venv-convert`; другой коммит — отказ; D-123) | `qf.export.converters.llama_cpp:LlamaCppConverter` | 17 | нет (внешняя программа; лениво) |
+| `Quantizer` | `QUANTIZERS` (`qf.export`, kind `quantizer`) | `llama_cpp_quantize` (`llama-quantize` того же коммита; D-123) | `qf.export.converters.llama_cpp:LlamaCppQuantizer` | 17 | нет (внешняя программа; лениво) |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `json_valid_rate`, `lenient_parse_rate`, `failed_output_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `key_field_accuracy`, `missing_exact_rate`, `conflict_recall`, `hallucination_rate` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
 | `Metric` | `METRICS` (`qf.eval`, kind `metric`) | `field_accuracy.origin`, `field_accuracy.destination`, `field_accuracy.pickup_date`, `field_accuracy.delivery_date`, `field_accuracy.equipment_type`, `field_accuracy.cargo_category`, `field_accuracy.pieces`, `field_accuracy.weight_total`, `field_accuracy.weight_per_piece`, `field_accuracy.temperature_c`, `field_accuracy.shipper_name` | `qf.eval.metrics.builtin:RateMetric` (подклассы, `_rate`)` | 9 | нет |
@@ -398,6 +400,13 @@ class ArtifactRef(BaseModel):  # frozen, extra="forbid"
 
 - Второй слой композиции рядом с CLI: `qf/cli/webui/` (логика `app.py`, HTTP `server.py` на `http.server`, страница `static/index.html`). Как и команды CLI, он импортирует стадии (`qf.data`, `qf.eval`) и домен, а стадии о нём не знают. Своих реестров и портов нет: оценка берётся из `SCORERS`, генерация — из `render_record`.
 - Сервер слушает только адреса этого компьютера и ничего не пишет в проект.
+
+## Реализация шага 17: отличия от текста Части C
+
+- Порт `ModelConverter` принимает путь к HF-папке, а не `ArtifactRef`: исходная база (эталон шага 17) — не артефакт `hf_model`, её веса проверены `qf train fetch-base`; родители GGUF передаются явно (sha слитого пакета или `weights_provenance.json` базы). Слитый пакет перед конвертацией сверяется со своим манифестом в CLI.
+- Реализации проверяют, что `third_party/llama.cpp` стоит ровно на закреплённом коммите, иначе отказ; коммит пишется в манифест каждого GGUF (ограничение 4 CLAUDE.md). Сборка — вне подмодуля (`third_party/llama.cpp-build/`, в `.gitignore`), чтобы подмодуль оставался чистым и манифесты прогонов не получали `git_dirty`.
+- `qf.export.gguf_meta` читает метаданные пакетом `gguf-py` из закреплённой копии llama.cpp (только numpy) и сверяет шаблон чата, BOS и EOS с HF-файлами.
+- Качество GGUF меряет `openai_local` против `llama-server` того же коммита (последовательно, `-np 1`); `llama-server` не описывает модель, поэтому `expected_context` и `expected_quantization` не задаются, а имя модели (`--alias`) несёт sha GGUF.
 
 ## Реализация шага 16: отличия от текста Части C
 

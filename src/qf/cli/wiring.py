@@ -1,7 +1,8 @@
 """Composition root: the only place where implementations are chosen (plan C.3, C.5).
 
 Heavy adapters are registered here lazily (the trainer of step 12, the HF backend of step 14,
-the merger of step 16).
+the merger of step 16,
+the GGUF converter and quantizer of step 17).
 Adapter modules are referenced only as strings: this module never imports them at top level.
 Importing this module makes every registry (and every lazy entry) visible to
 `qf.common.all_registries()`.
@@ -20,7 +21,7 @@ import qf.domain  # noqa: F401  (imported for its registries: TASKS)
 import qf.eval  # noqa: F401  (imported for its registries: METRICS)
 from qf.backends import BACKENDS
 from qf.common import ComponentConfig, QFError, Registry
-from qf.export import MERGERS
+from qf.export import CONVERTERS, MERGERS, QUANTIZERS
 from qf.training import TRAINERS
 
 __all__ = ["build"]
@@ -29,6 +30,8 @@ TRAINERS.register_lazy("hf_trainer_qlora", "qf.training.trainers.hf_qlora:HFQLoR
                        extra="train-cuda")  # fmt: skip
 BACKENDS.register_lazy("hf_local", "qf.backends.hf_local:HFLocalBackend", extra="train-cuda")
 MERGERS.register_lazy("peft_merge", "qf.export.mergers.peft_merge:PeftMerger", extra="train-cuda")
+CONVERTERS.register_lazy("llama_cpp_convert", "qf.export.converters.llama_cpp:LlamaCppConverter")
+QUANTIZERS.register_lazy("llama_cpp_quantize", "qf.export.converters.llama_cpp:LlamaCppQuantizer")
 
 
 def build(registry: Registry[Any], selector: ComponentConfig) -> Any:

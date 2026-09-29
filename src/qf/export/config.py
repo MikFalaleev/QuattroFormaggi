@@ -9,7 +9,13 @@ from pydantic import Field
 
 from qf.common import ComponentConfig, StrictConfig
 
-__all__ = ["EXPORT_MANIFEST", "ExportMergeConfig", "MergeTarget", "VerifySettings"]
+__all__ = [
+    "EXPORT_MANIFEST",
+    "ExportGgufConfig",
+    "ExportMergeConfig",
+    "MergeTarget",
+    "VerifySettings",
+]
 
 EXPORT_MANIFEST = "qf_export_manifest.json"
 """Written into the merged directory: base, adapter, dtype, sha256 of every file, versions."""
@@ -44,3 +50,14 @@ class VerifySettings(StrictConfig):
 class ExportMergeConfig(StrictConfig):
     merger: ComponentConfig
     verify: VerifySettings = Field(default_factory=VerifySettings)
+
+
+class ExportGgufConfig(StrictConfig):
+    """`configs/export/gguf.yaml` (plan step 17, D-123): the converter, the quantizer (both pin
+    the same llama.cpp commit), the checkout's gguf-py and the unquantized output type."""
+
+    converter: ComponentConfig
+    quantizer: ComponentConfig
+    gguf_py: Path = Path("third_party/llama.cpp/gguf-py")
+    outtype: Literal["bf16", "f16", "f32"] = "bf16"
+    out_dir: Path = Path("artifacts/gguf")
