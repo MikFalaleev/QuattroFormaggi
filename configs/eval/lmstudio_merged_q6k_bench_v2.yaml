@@ -1,0 +1,79 @@
+# Step 18 (D-112 gates, final check): the release candidate Q6_K GGUF (artifacts/gguf/…-Q6_K.gguf, sha256 f0de6213…)
+# imported with `lms import --copy`, in LM Studio 0.4.25+1 on bench_v2. Gate mode = without the JSON schema:
+#   lms load quattro-formaggi-12b-logistics-v0.1 --context-length 4096 --gpu max --parallel 1
+#   uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml --json-schema off
+#   uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml --json-schema on
+name: lmstudio_merged_q6k_bench_v2
+backend:
+  name: openai_local
+  base_url: http://127.0.0.1:1234/v1
+  model_substring: quattro-formaggi
+  timeout_s: 300
+  stream: true
+  expected_context: 4096
+  expected_quantization: Q6_K
+  runtime: LM Studio 0.4.25+1
+bench:
+  path: data/splits_v2/bench_v2.jsonl
+  sha256: 964c5c157d800648192ad6624cbb782d81c5329772b5fdfc5229c9f80d684b59
+generation:
+  max_tokens: 768
+  temperature: 0.0
+metrics:
+  - json_valid_rate
+  - lenient_parse_rate
+  - failed_output_rate
+  - key_field_accuracy
+  - field_accuracy_micro
+  - field_accuracy.origin
+  - field_accuracy.destination
+  - field_accuracy.pickup_date
+  - field_accuracy.delivery_date
+  - field_accuracy.equipment_type
+  - field_accuracy.cargo_category
+  - field_accuracy.pieces
+  - field_accuracy.weight_total
+  - field_accuracy.weight_per_piece
+  - field_accuracy.shipper_name
+  - field_accuracy.special_conditions
+  - special_conditions_exact_rate
+  - field_accuracy.special_conditions.temperature
+  - field_accuracy.special_conditions.securing
+  - field_accuracy.special_conditions.packaging
+  - field_accuracy.special_conditions.oversize
+  - field_accuracy.special_conditions.sensors
+  - condition_precision
+  - condition_recall
+  - condition_precision.temperature
+  - condition_precision.securing
+  - condition_precision.packaging
+  - condition_precision.oversize
+  - condition_precision.sensors
+  - condition_recall.temperature
+  - condition_recall.securing
+  - condition_recall.packaging
+  - condition_recall.oversize
+  - condition_recall.sensors
+  - missing_f1
+  - missing_exact_rate
+  - conflict_recall
+  - hallucination_rate
+  - critical_error_count
+  - critical_error_count.pieces_weight_swap
+  - critical_error_count.wrong_unit_magnitude
+  - critical_error_count.origin_destination_swap
+  - critical_error_count.hallucinated_required_field
+  - critical_error_count.missed_conflict
+  - critical_error_count.hallucinated_condition
+  - critical_error_count.missed_condition
+slice_metrics:
+  - json_valid_rate
+  - key_field_accuracy
+  - field_accuracy_micro
+  - special_conditions_exact_rate
+  - condition_precision
+  - condition_recall
+  - missing_f1
+  - conflict_recall
+  - hallucination_rate
+  - critical_error_count
