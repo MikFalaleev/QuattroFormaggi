@@ -38,6 +38,8 @@ src/qf/
 ├── contracts/           # КОНТРАКТЫ (типы и интерфейсы; зависит только от common)
 │   ├── _model.py        #   ContractModel (strict, frozen, extra=forbid), NonEmptyStr — шаг 4
 │   ├── card_v1.py       #   ShipmentCard, Quantity, Place, Conflict, ExtractionTarget
+│   ├── card_v2.py       #   card_v2: типы транспорта, особые условия (D-080…D-086)
+│   ├── facts_v2.py      #   LoadFactsV2 (подшаг V2)
 │   ├── records.py       #   SFTRecord, VariantInfo (Message — из generation.py)
 │   ├── generation.py    #   GenerationRequest, GenerationResult
 │   ├── facts.py         #   LoadFacts (шаг 5)
@@ -50,27 +52,33 @@ src/qf/
 ├── domain/              # ДОМЕННАЯ ЛОГИКА (чистые функции; contracts + common)
 │   ├── units.py         #   to_kg, from_kg, правила округления
 │   ├── rules.py         #   compute_missing_fields, check_target_consistency, total_weight_kg
+│   ├── rules_v2.py      #   правило missing_fields и согласованность card_v2 (D-084)
+│   ├── schemas.py       #   реестр схем ответа TARGET_SCHEMAS по версиям (D-086)
+│   ├── records_jsonl.py #   parse_sft_jsonl: разбор и проверка jsonl записей
 │   ├── geo.py           #   20 российских городов: регионы, EN-названия, падежи, координаты
 │   ├── serialization.py #   serialize_target, parse_target, parse_target_lenient
 │   ├── tasks.py         #   TaskSpec, реестр задач TASKS (D-040) — шаг 4
 │   ├── record_checks.py #   check_record: проверки одной SFT-записи (коды шага 7) — шаг 4
 │   ├── prompting.py     #   load_system_prompt, build_messages (единые для data/training/runtime)
-│   ├── prompts/         #   system_extract_v1.txt (package data)
-│   └── validation.py    #   независимая проверка значений карточки (даты, диапазоны, города) — шаг 18
+│   ├── prompts/         #   system_extract_v1.txt, system_extract_v2.txt (package data)
+│   └── validation.py    #   check_card_values: города, даты, вес ≤ 25 000 кг — шаг 18 (D-126)
 ├── backends/            # АДАПТЕРЫ ГЕНЕРАЦИИ (реализуют GenerationBackend)
 │   ├── fake.py          #   для тестов
 │   ├── openai_local.py  #   LocalOpenAIClient + backend: LM Studio, llama-server
 │   └── hf_local.py      #   transformers (+ peft адаптер); тяжёлые импорты лениво
-├── data/                # СТАДИИ ДАННЫХ: fetch, profile, facts, render/, generate, split, validate, report, benchmark
-├── eval/                # ОЦЕНКА: metrics/, stats, harness, report
-├── training/            # ОБУЧЕНИЕ QF-12B: features, collator, estimate, trainers/ (адаптеры AdapterTrainer)
-├── export/              # ЭКСПОРТ: mergers/, converters/ (конвертация и квантование через llama.cpp), verify, gguf_meta, release
-├── runtime/             # ПРИКЛАДНОЙ СЛОЙ: extract (сценарии, которые видит пользователь)
+├── baselines/           # НИЖНИЕ ГРАНИЦЫ без LLM: пустая карточка и правила (backends `baseline_empty`, `baseline_rules`, D-109)
+├── data/                # СТАДИИ ДАННЫХ: fetch, profile, raw_tables, facts, conditions (v2), city_map, render/ (семейства, трудные случаи, условия), generate, review, split, validate, report, benchmark, manual_cases, sft_io
+├── eval/                # ОЦЕНКА: metrics/ (builtin, case_scoring, case_scoring_v2, scorers), slices, stats, harness, results, report
+├── training/            # ОБУЧЕНИЕ QF-12B: tokenizer_io, features, collator, audit, estimate, config, weights_io, experiments, events, verify, trainers/hf_qlora/ (адаптер AdapterTrainer)
+├── export/              # ЭКСПОРТ: adapters (резервная копия), mergers/peft_merge, converters/llama_cpp (GGUF и квантование), gguf_meta, verify, config, registry
+├── runtime/             # ПРИКЛАДНОЙ СЛОЙ: extract — `extract_card`, `ExtractConfig`, `ExtractionResult` (шаг 18, D-126)
 ├── lab/                 # QF-LAB: полностью изолирован
 └── cli/                 # КОМПОЗИЦИЯ: разбор аргументов, сборка объектов из конфига, вызов use-case
     ├── main.py          #   main(argv) -> int, таблица команд
+    ├── command_log.py   #   журнал команд qf `runs/commands-<машина>.jsonl` (D-118)
+    ├── webui/           #   локальный веб-интерфейс `qf ui` (D-107)
     ├── wiring.py        #   build_backend(cfg), build_trainer(cfg), … — единственное место, где выбираются реализации
-    └── commands/        #   по модулю на группу команд: data.py, eval.py, train.py, export.py, runtime.py, lab.py
+    └── commands/        #   по модулю на группу команд: doctor.py, data.py, bench.py, eval.py, tokens.py, train.py, export.py, extract.py, ui.py (lab.py — QF-Lab, ещё нет)
 ```
 
 Модули `qf.data.schema`, `qf.data.units`, `qf.data.rules`, `qf.data.geo`, `qf.data.prompts`, `qf.runtime.client`, `qf.eval.backends` из ранних версий плана **не создаются**. Их место — `qf.contracts`, `qf.domain` и `qf.backends` соответственно. Все шаги ниже уже используют новые пути.

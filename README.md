@@ -71,6 +71,16 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 
 Ручная проверка в браузере (без модели; сервер только на этом компьютере): `uv run qf ui`, затем открыть http://127.0.0.1:8765/.
 
+Работа с моделью в LM Studio (шаг 18; нужен импорт GGUF и запущенный сервер — только по решению человека):
+
+```bash
+lms import --copy --user-repo qf-local/Quattro-Formaggi-12B-Logistics-v0.1-GGUF artifacts/gguf/Quattro-Formaggi-12B-Logistics-v0.1-Q6_K.gguf
+lms load quattro-formaggi-12b-logistics-v0.1 --context-length 4096 --gpu max --parallel 1
+lms server start --port 1234 --bind 127.0.0.1
+uv run qf extract --text "Нужна реф-фура Пермь - Казань, 18 паллет, 12,6 т, +2..+6, погрузка 14 октября" --request-date 2026-09-30
+uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml --json-schema off   # проверка порогов (E306)
+```
+
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); обучение QLoRA, оценка в HF, слияние и сборка GGUF — арендованная машина Linux + NVIDIA (использовалась 1× H100 NVL 94 ГБ). См. `docs/PROJECT.md`, раздел 4.
 
 ## Команды
@@ -96,7 +106,7 @@ uv run qf eval run --config data/processed/fake_eval/fake_bench_v2.yaml
 | `qf export adapter runs/<id> --name NAME`, `qf export verify --adapter PATH` | 15 | реализованы: резервная копия принятого адаптера в `artifacts/adapters/<name>/` со своим манифестом и её проверка; копию вне компьютера делает пользователь (D-121) |
 | `qf export merge --adapter artifacts/adapters/<name> [--out DIR]`, `qf export verify --merged DIR [--files-only]` | 16 | реализованы: адаптер вливается в базу bf16 → `artifacts/merged/…` (HF safetensors, токенизатор базы без изменений, манифест с хэшами); проверка слитой модели против «база + адаптер» или только по файлам (D-122). Нужна машина с GPU и ≥48 ГБ RAM |
 | `qf export gguf --source DIR --name NAME [--qtypes Q4_K_M,Q5_K_M]`, `qf export verify --gguf FILE` | 17 | реализованы: HF-модель → GGUF BF16 → квантованные GGUF закреплённым llama.cpp (`third_party/llama.cpp` @42916d83 — как в LM Studio 0.4.25), метаданные сверяются с HF; качество — `qf eval run` против `llama-server` (`configs/eval/llamacpp_*`) (D-123, D-124) |
-| `qf extract` | 18 | не реализована |
+| `qf extract (--text TEXT \| --file FILE) [--request-date YYYY-MM-DD] [--language auto\|ru\|en] [--config configs/runtime/extract.yaml] [--json]` | 18 | реализована: заявка → карточка `card_v2` через локальную модель (LM Studio, `openai_local`, только loopback); ответ разбирается строго, `missing_fields` пересчитывает код, значения проверяются независимо (город, даты, вес); статус `ok` / `invalid_output` / `backend_error`, код выхода 0 только при `ok` (D-126) |
 | `qf release check` | 19 | не реализована |
 | `qf lab …` | L1–L6 | не реализована |
 

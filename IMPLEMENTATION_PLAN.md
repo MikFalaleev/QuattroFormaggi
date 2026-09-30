@@ -1752,6 +1752,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 
 ### Шаг 13. Удалённый GPU: окружение и smoke-прогон (10–20 шагов)
 
+**Реализовано 28.09.2026** (D-118, D-119): smoke E301 на арендованной H100 NVL (`20260928-142059-train-39e3f2`, 1406 ток/с), гипотезы H1–H5 подтверждены; сервер и протокол эксперимента — `research/GPU_SETUP_IMMERS.md`, `configs/experiments/E301.yaml`.
+
 **Цель.** На реальной GPU-машине:
 
 - загрузить pinned-базу;
@@ -1799,6 +1801,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 ---
 
 ### Шаг 14. Пилотное обучение и оценка адаптера
+
+**Реализовано 28.09.2026** (D-119, D-120): пилот E302, три seed (42/43/44; val loss 0,000713 / 0,000719 / 0,000877), оценка генерацией в HF (E303, backend `hf_local`): база 0,0135 → адаптер seed 42 0,9505 на `bench_v2`, П4 выполнен. Пользователь принял адаптер seed 42. Отчёт — `runs/20260928-143401-train-7a10a1/experiment_report.md` (вне Git).
 
 **Цель.** Одна эпоха на train, validation и checkpoint, затем оценка на `bench_v1` в том же backend, что и baseline исходной модели. Решение: принять или отклонить адаптер.
 
@@ -1848,6 +1852,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 
 ### Шаг 15. Резервное копирование адаптера
 
+**Реализовано 28.09.2026** (D-121): `qf export adapter|verify --adapter`, копия `artifacts/adapters/qf-12b-logistics-v0.1-seed42/` (sha256 `ef058b72…`).
+
 Короткий обязательный шаг.
 
 - Скопировать `runs/<pilot_id>/adapter/` + манифест в `artifacts/adapters/<name>/`.
@@ -1860,6 +1866,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 ---
 
 ### Шаг 16. Merge в полноценные веса и HF-пакет
+
+**Реализовано 29.09.2026** (D-122, E304): `peft_merge`, `qf export merge|verify --merged`, пакет `artifacts/merged/Quattro-Formaggi-12B-Logistics-v0.1` (sha256 `88e51a67…`); слитая bf16 на `bench_v2`: key 0,959, json 0,982.
 
 **Цель.** Объединённая модель BF16 в HF-формате, проверенная против адаптерной версии.
 
@@ -1905,6 +1913,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 
 ### Шаг 17. Конвертация в GGUF и квантование (pinned llama.cpp)
 
+**Реализовано 29.09.2026** (D-123…D-125, E305): llama.cpp `42916d83` (= движок LM Studio 0.4.25), форматы BF16, Q4_K_M, Q5_K_M, Q6_K, Q8_0; кандидат в релиз — Q6_K (`f0de6213…`); П5 по утверждённому тексту (три вида П3) у Q6_K выполнен.
+
 **Цель.** GGUF BF16 → Q4_K_M (и опционально Q5_K_M) и проверка качества против merged.
 
 **Предусловия.** Шаг 16 принят.
@@ -1941,6 +1951,8 @@ CLI: `qf eval-baseline --config configs/eval/lmstudio_baseline_v1.yaml [--json-s
 ---
 
 ### Шаг 18. Runtime-команда `qf extract` и приёмка в LM Studio
+
+**Реализовано 30.09.2026** (D-126…D-128, E306): `qf extract` (`qf.runtime.extract_card`, `qf.domain.check_card_values`; функция названа `extract_card`, а не `extract`, из-за конфликта с модулем), приёмка Q6_K в LM Studio на закоммиченном коде `bb4b37d`: П1, П2 (0,9505), П4 (+0,946), П6 выполнены; П3 (1 пропущенное условие) и П3м (4) не выполнены — исключения приняты пользователем, результат подан на сравнительной базе систем (`docs/EVAL_SPEC.md`); стабильность 28 из 30 принята с допущением. Сравнение с каталожным baseline шага 10 — справочно.
 
 **Цель.**
 
