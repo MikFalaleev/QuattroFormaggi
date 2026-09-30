@@ -25,6 +25,14 @@ GGUF собраны llama.cpp `42916d83f4a225e56709f873aa8050ac11f5b6a4` — д�
 
 Ответ — один JSON-объект `{"card": {...}, "missing_fields": [...], "conflicts": [...]}` (схема `card_v2`). Неизвестное значение — `null`; вес копируется как в тексте (`{"value": 12.6, "unit": "t"}`), пересчёт делает код. Модель нужно вызывать с **точным системным промптом обучения** (`system_extract_v2`, sha256 `fa3297296346666443f60d0318f01eed7c669032ffcacc534e8fd166544f4e41`; файл `src/qf/domain/prompts/system_extract_v2.txt` в репозитории проекта) и с датой запроса первой строкой сообщения пользователя (`Дата запроса: ГГГГ-ММ-ДД`, по-английски `Request date: YYYY-MM-DD`). Температура 0, контекст не меньше 4096. Ограничивающая JSON-схема необязательна (см. результаты).
 
+В llama.cpp (репозиторий на Hugging Face предлагает BF16 первым — файл Q6_K нужно указать явно):
+
+```bash
+llama-server -hf MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF:Q6_K -c 4096
+```
+
+Системный промпт в GGUF-файле не хранится: его передают системным сообщением в каждом запросе (файл `system_extract_v2.txt` в репозиториях).
+
 В LM Studio:
 
 ```bash
@@ -127,8 +135,8 @@ uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml 
 uv run qf release check                  # артефакты, родословная до сырого датасета, эта карточка
 ```
 
-Файл Q6_K получен квантованием BF16-GGUF закреплённым `llama-quantize` через небольшой скрипт проекта (`research/tools/qf_quantize_extra.py`, прогон `20260929-070902-export-quantize-cc97f9`), который **не входит в команды репозитория**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` использует тот же квантователь для других типов, но воспроизведение Q6_K самой командой `qf` не проверялось. Конфиги — в `configs/`; решения, стоящие за каждым выбором, — `docs/DECISIONS.md` (D-012…D-129), определения метрик — `docs/EVAL_SPEC.md`.
+Файл Q6_K получен квантованием BF16-GGUF закреплённым `llama-quantize` через небольшой скрипт проекта (`research/tools/qf_quantize_extra.py`, прогон `20260929-070902-export-quantize-cc97f9`), который **не входит в команды репозитория**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` использует тот же квантователь для других типов, но воспроизведение Q6_K самой командой `qf` не проверялось. Конфиги — в `configs/`; решения, стоящие за каждым выбором, — `docs/DECISIONS.md` (D-012…D-131), определения метрик — `docs/EVAL_SPEC.md`.
 
 ## Лицензия и атрибуция
 
-Apache-2.0, как у базовой модели. Базовая модель: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Источник данных: Yogape Rodriguez (2025), `yogape/logistics-operations`, лицензия MIT. Выпуск пока никуда не загружен; публикуется только по решению автора.
+Apache-2.0, как у базовой модели. Базовая модель: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Источник данных: Yogape Rodriguez (2025), `yogape/logistics-operations`, лицензия MIT. Опубликовано автором на Hugging Face: веса и адаптер `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1`, GGUF-файлы `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF`, синтетические данные (датасет) `MikhailSAI/Quattro-Formaggi-Logistics-Synthetic-v0.1`.

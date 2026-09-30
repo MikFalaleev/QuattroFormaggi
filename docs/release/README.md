@@ -40,6 +40,14 @@ GGUF files were built with llama.cpp `42916d83f4a225e56709f873aa8050ac11f5b6a4`,
 
 The answer is one JSON object `{"card": {...}, "missing_fields": [...], "conflicts": [...]}` (schema `card_v2`). An unknown value is `null`; weight is copied as written (`{"value": 12.6, "unit": "t"}`) and converted by code. The model must be called with the **exact system prompt it was trained with** (`system_extract_v2`, sha256 `fa3297296346666443f60d0318f01eed7c669032ffcacc534e8fd166544f4e41`; file `src/qf/domain/prompts/system_extract_v2.txt` in the project repository) and the request date as the first line of the user message (`Request date: YYYY-MM-DD`, in Russian `Дата запроса: YYYY-MM-DD`). Use temperature 0 and a context of at least 4096. JSON-schema constrained decoding is optional (see results).
 
+With llama.cpp (the Hugging Face repository lists BF16 first; ask for the Q6_K file explicitly):
+
+```bash
+llama-server -hf MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF:Q6_K -c 4096
+```
+
+The system prompt is not stored in the GGUF file: send it as the system message of every request (file `system_extract_v2.txt` in the repositories).
+
 With LM Studio:
 
 ```bash
@@ -142,8 +150,8 @@ uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml 
 uv run qf release check                  # artifacts, lineage to the raw dataset, this card
 ```
 
-The Q6_K file was made by quantizing the BF16 GGUF with the pinned `llama-quantize` through a small script of the project (`research/tools/qf_quantize_extra.py`, run `20260929-070902-export-quantize-cc97f9`), which is **not part of the repository's commands**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` uses the same quantizer for other types, but reproducing Q6_K with a `qf` command itself has not been verified. Configs are in `configs/`; the decisions behind every choice are in `docs/DECISIONS.md` (D-012 to D-129) and the metric definitions in `docs/EVAL_SPEC.md`.
+The Q6_K file was made by quantizing the BF16 GGUF with the pinned `llama-quantize` through a small script of the project (`research/tools/qf_quantize_extra.py`, run `20260929-070902-export-quantize-cc97f9`), which is **not part of the repository's commands**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` uses the same quantizer for other types, but reproducing Q6_K with a `qf` command itself has not been verified. Configs are in `configs/`; the decisions behind every choice are in `docs/DECISIONS.md` (D-012 to D-131) and the metric definitions in `docs/EVAL_SPEC.md`.
 
 ## License and attribution
 
-Apache-2.0, as the base model. Base model: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Data source: Yogape Rodriguez (2025), `yogape/logistics-operations`, MIT licence. This release has not been uploaded anywhere yet; it is published only by the author's decision.
+Apache-2.0, as the base model. Base model: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Data source: Yogape Rodriguez (2025), `yogape/logistics-operations`, MIT licence. Published by the author on Hugging Face: weights and adapter `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1`, GGUF files `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF`, synthetic data (dataset) `MikhailSAI/Quattro-Formaggi-Logistics-Synthetic-v0.1`.
