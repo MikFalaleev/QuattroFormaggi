@@ -18,9 +18,25 @@ from qf.export.config import (
 )
 from qf.export.gguf_meta import check_gguf_against_hf, hf_tokenizer_facts, read_gguf_metadata
 from qf.export.registry import CONVERTERS, MERGERS, QUANTIZERS
+from qf.export.release import (
+    PLACEHOLDER,
+    RELEASE_MANIFEST,
+    ReleaseArtifact,
+    ReleaseConfig,
+    ReleaseManifest,
+    build_release,
+    release_check,
+)
 from qf.export.verify import MergeVerification, PromptCheck, verify_merged, verify_merged_files
 
 __all__ = [
+    "PLACEHOLDER",
+    "RELEASE_MANIFEST",
+    "ReleaseArtifact",
+    "ReleaseConfig",
+    "ReleaseManifest",
+    "build_release",
+    "release_check",
     "ADAPTERS_DIR",
     "ADAPTER_MANIFEST",
     "CONVERTERS",

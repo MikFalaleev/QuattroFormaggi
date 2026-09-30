@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 
 from qf import __version__
 from qf.cli.command_log import list_runs, record_command
-from qf.cli.commands import bench, data, doctor, export, extract, tokens, train, ui
+from qf.cli.commands import bench, data, doctor, export, extract, release, tokens, train, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -222,7 +222,20 @@ _SPECS = (
         extract.run,
         extract.configure,
     ),
-    CommandSpec("release check", "19", "check release completeness"),
+    CommandSpec(
+        "release build",
+        "19",
+        "write the release manifest and copy the model cards (nothing is uploaded)",
+        release.run_build,
+        release.configure_build,
+    ),
+    CommandSpec(
+        "release check",
+        "19",
+        "check the release: artifacts, lineage to the raw dataset, model cards, gates table",
+        release.run_check,
+        release.configure_check,
+    ),
     CommandSpec("lab", "L1-L6", "QF-Lab from-scratch Transformer track"),
 )
 COMMANDS: dict[str, CommandSpec] = {spec.name: spec for spec in _SPECS}

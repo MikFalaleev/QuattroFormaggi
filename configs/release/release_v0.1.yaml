@@ -1,0 +1,21 @@
+# Step 19 (D-129): the release of v0.1. `qf release build` copies the cards from docs/release/
+# into artifacts/release/ and writes release_manifest.json from the artifacts' own manifests;
+# `qf release check` verifies everything. Nothing is uploaded anywhere (publishing is the owner's decision).
+release: Quattro-Formaggi-12B-Logistics-v0.1
+license: Apache-2.0
+base_model: mistralai/Mistral-Nemo-Instruct-2407
+base_revision: 04d8a90549d23fc6bd7f642064003592df51e9b3
+release_dir: artifacts/release
+artifacts:
+  adapter: artifacts/adapters/qf-12b-logistics-v0.1-seed42
+  merged: artifacts/merged/Quattro-Formaggi-12B-Logistics-v0.1
+  gguf: artifacts/gguf/Quattro-Formaggi-12B-Logistics-v0.1-Q6_K.gguf
+  gguf_bf16: artifacts/gguf/Quattro-Formaggi-12B-Logistics-v0.1-BF16.gguf
+card_sources:
+  README.md: docs/release/README.md
+  README.ru.md: docs/release/README.ru.md
+docs:
+  - docs/EVAL_SPEC.md
+  - docs/DATA_SPEC.md
+  - docs/DECISIONS.md
+  - docs/MODEL_CARD.md

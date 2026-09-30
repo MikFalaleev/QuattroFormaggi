@@ -42,6 +42,7 @@ PLANNED_COMMANDS = {
     "export adapter",  # the backup copy of step 15 (D-121)
     "export verify",
     "extract",
+    "release build",
     "release check",
     "lab",
 }
@@ -78,7 +79,7 @@ def test_unimplemented_command_exits_2(name: str, capsys: pytest.CaptureFixture[
     assert f"Stage {COMMANDS[name].stage} " in err
 
 
-@pytest.mark.parametrize("name", ["release check", "lab"])
+@pytest.mark.parametrize("name", ["lab"])
 def test_unimplemented_command_with_arguments_still_exits_2(
     name: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -133,11 +134,11 @@ def test_string_system_exit_maps_to_1(
 
 def test_module_entry_point() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "qf", "release", "check"], capture_output=True, text=True,
+        [sys.executable, "-m", "qf", "lab"], capture_output=True, text=True,
         check=False,
     )  # fmt: skip
     assert result.returncode == 2
-    assert "Stage 19 is not implemented yet" in result.stderr
+    assert "Stage L1-L6 is not implemented yet" in result.stderr
 
 
 def test_system_exit_without_code_maps_to_0(monkeypatch: pytest.MonkeyPatch) -> None:

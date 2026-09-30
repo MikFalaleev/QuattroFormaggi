@@ -70,7 +70,7 @@ src/qf/
 ├── data/                # СТАДИИ ДАННЫХ: fetch, profile, raw_tables, facts, conditions (v2), city_map, render/ (семейства, трудные случаи, условия), generate, review, split, validate, report, benchmark, manual_cases, sft_io
 ├── eval/                # ОЦЕНКА: metrics/ (builtin, case_scoring, case_scoring_v2, scorers), slices, stats, harness, results, report
 ├── training/            # ОБУЧЕНИЕ QF-12B: tokenizer_io, features, collator, audit, estimate, config, weights_io, experiments, events, verify, trainers/hf_qlora/ (адаптер AdapterTrainer)
-├── export/              # ЭКСПОРТ: adapters (резервная копия), mergers/peft_merge, converters/llama_cpp (GGUF и квантование), gguf_meta, verify, config, registry
+├── export/              # ЭКСПОРТ: adapters (резервная копия), mergers/peft_merge, converters/llama_cpp (GGUF и квантование), gguf_meta, verify, release (манифест выпуска и `release_check`, шаг 19), config, registry
 ├── runtime/             # ПРИКЛАДНОЙ СЛОЙ: extract — `extract_card`, `ExtractConfig`, `ExtractionResult` (шаг 18, D-126)
 ├── lab/                 # QF-LAB: полностью изолирован
 └── cli/                 # КОМПОЗИЦИЯ: разбор аргументов, сборка объектов из конфига, вызов use-case
@@ -78,7 +78,7 @@ src/qf/
     ├── command_log.py   #   журнал команд qf `runs/commands-<машина>.jsonl` (D-118)
     ├── webui/           #   локальный веб-интерфейс `qf ui` (D-107)
     ├── wiring.py        #   build_backend(cfg), build_trainer(cfg), … — единственное место, где выбираются реализации
-    └── commands/        #   по модулю на группу команд: doctor.py, data.py, bench.py, eval.py, tokens.py, train.py, export.py, extract.py, ui.py (lab.py — QF-Lab, ещё нет)
+    └── commands/        #   по модулю на группу команд: doctor.py, data.py, bench.py, eval.py, tokens.py, train.py, export.py, extract.py, release.py, ui.py (lab.py — QF-Lab, ещё нет)
 ```
 
 Модули `qf.data.schema`, `qf.data.units`, `qf.data.rules`, `qf.data.geo`, `qf.data.prompts`, `qf.runtime.client`, `qf.eval.backends` из ранних версий плана **не создаются**. Их место — `qf.contracts`, `qf.domain` и `qf.backends` соответственно. Все шаги ниже уже используют новые пути.

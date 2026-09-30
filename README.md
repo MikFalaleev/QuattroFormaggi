@@ -7,7 +7,7 @@
 
 ## Статус (30.09.2026)
 
-Реализованы **шаги 1–18** из `IMPLEMENTATION_PLAN.md` (шаг 18 — команда `qf extract` и приёмка Q6_K в LM Studio; исключения по П3/П3м приняты, D-128); впереди шаг 19 (выпуск v0.1).
+Реализованы **шаги 1–19** из `IMPLEMENTATION_PLAN.md`: шаг 18 — `qf extract` и приёмка Q6_K в LM Studio (исключения по П3/П3м приняты, D-128); шаг 19 — выпуск v0.1: `qf release build|check`, модельные карточки (`docs/release/README.md` английская, `README.ru.md` русская), `qf release check` проходит на реальном выпуске (D-129, D-130). **Публикация не выполнялась** — это отдельное решение владельца проекта.
 
 - **Данные** (шаги 2–8, подшаги V1–V6): закреплённый табличный датасет `yogape/logistics-operations` (MIT) → факты о 85 410 загрузках с российскими городами → синтетические заявки по детерминированным шаблонам, эталоны вычисляет код (не LLM); `generated_v2`: 1 500 записей train / 150 val / 600 test / 300 test_ood; замороженный бенчмарк `bench_v2` — 271 запись, из них 33 заявки-макета, настоящих заявок нет.
 - **Оценка** (шаги 9–10): 26 метрик, критические ошибки, bootstrap-интервалы, McNemar; пороги релиза П1–П6 утверждены **до обучения** и не меняются (`docs/EVAL_SPEC.md`, D-112).
@@ -35,7 +35,7 @@
 - **П3м** (≤ 2 ошибки на 33 макетах) не выполнен ни одной дообученной моделью: 3–5 ошибок во всех системах. Таблица всех моделей и систем — `docs/EVAL_SPEC.md`, «Результаты проверки порогов».
 - **Слабые места:** заявки-макеты, похожие на живые письма (key 0,67–0,82 в зависимости от seed и формата); незнакомый шаблон заявки (test_ood T7 — 0,86: «7 718кг» читается как 718 кг, сленг «борт», «реф»). Находки для следующей версии данных — `docs/TODO.md`.
 
-Все решения — `docs/DECISIONS.md` (D-012…D-128); журнал исследования и карточки экспериментов ведутся вне Git.
+Все решения — `docs/DECISIONS.md` (D-012…D-130); журнал исследования и карточки экспериментов ведутся вне Git.
 
 Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/TODO.md` (отложенные задачи и напоминания), `docs/PLAN_card_v2.md` (утверждённый план карточки `card_v2`: типы транспорта и особые условия, подшаги V1–V6 до шага 10), `AGENTS.md` (правила для coding agents).
 
@@ -81,6 +81,13 @@ uv run qf extract --text "Нужна реф-фура Пермь - Казань, 
 uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml --json-schema off   # проверка порогов (E306)
 ```
 
+Выпуск (шаг 19; ничего не загружается наружу):
+
+```bash
+uv run qf release build     # манифест выпуска + карточки → artifacts/release/
+uv run qf release check     # артефакты, родословная до сырого датасета, карточки (хэши всех файлов, несколько минут)
+```
+
 Поддерживаемое оборудование: разработка, данные и inference — macOS на Apple Silicon (LM Studio); обучение QLoRA, оценка в HF, слияние и сборка GGUF — арендованная машина Linux + NVIDIA (использовалась 1× H100 NVL 94 ГБ). См. `docs/PROJECT.md`, раздел 4.
 
 ## Команды
@@ -107,7 +114,7 @@ uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml 
 | `qf export merge --adapter artifacts/adapters/<name> [--out DIR]`, `qf export verify --merged DIR [--files-only]` | 16 | реализованы: адаптер вливается в базу bf16 → `artifacts/merged/…` (HF safetensors, токенизатор базы без изменений, манифест с хэшами); проверка слитой модели против «база + адаптер» или только по файлам (D-122). Нужна машина с GPU и ≥48 ГБ RAM |
 | `qf export gguf --source DIR --name NAME [--qtypes Q4_K_M,Q5_K_M\|none]`, `qf export verify --gguf FILE` | 17 | реализованы: HF-модель → GGUF BF16 → квантованные GGUF закреплённым llama.cpp (`third_party/llama.cpp` @42916d83 — как в LM Studio 0.4.25), метаданные сверяются с HF; качество — `qf eval run` против `llama-server` (`configs/eval/llamacpp_*`) (D-123, D-124) |
 | `qf extract (--text TEXT \| --file FILE) [--request-date YYYY-MM-DD] [--language auto\|ru\|en] [--config configs/runtime/extract.yaml] [--json]` | 18 | реализована: заявка → карточка `card_v2` через локальную модель (LM Studio, `openai_local`, только loopback); ответ разбирается строго, `missing_fields` пересчитывает код, значения проверяются независимо (город, даты, вес); статус `ok` / `invalid_output` / `backend_error`, код выхода 0 только при `ok` (D-126) |
-| `qf release check` | 19 | не реализована |
+| `qf release build [--config configs/release/release_v0.1.yaml]`, `qf release check [--release-dir DIR] [--skip-hashes]` | 19 | реализованы: сборка манифеста выпуска и копирование карточек; проверка артефактов, родословной до сырого датасета (с хэшами), карточек (нет `<…>`, хэши артефактов названы, таблица порогов с числами) — код 0 только если всё на месте (D-130) |
 | `qf lab …` | L1–L6 | не реализована |
 
 Нереализованная команда всегда завершается кодом 2 с сообщением `Stage <N> is not implemented yet` — она никогда не имитирует успешный результат.
