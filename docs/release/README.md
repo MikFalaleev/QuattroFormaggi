@@ -64,11 +64,11 @@ Fully synthetic. Requests are rendered by deterministic templates (8 template fa
 
 `bench_v2` contains 238 synthetic records and **33 requests written by the project's coding assistant to look like live emails ("mocks")**; it holds **no real customer requests**. Special conditions appear in about 44% of the training records (660 of 1500) and in 56% of `bench_v2` (152 of 271).
 
-**Human review share: 0 records reviewed one by one.** Gold answers are computed by code. The project owner read curated samples of the generated data and accepted the benchmark review in bulk: the review verdicts of `bench_v2` (276 ok, 0 fixed, 0 dropped) are the coding assistant's own preliminary verdicts, copied by the owner without changes (D-102); the 33 mock requests and their gold cards were written by the assistant (D-103).
+**Human review share: 0 records reviewed one by one.** Gold answers are computed by code. The author read curated samples of the generated data and accepted the benchmark review in bulk: the review verdicts of `bench_v2` (276 ok, 0 fixed, 0 dropped) are the coding assistant's own preliminary verdicts, copied without changes (D-102); the 33 mock requests and their gold cards were written by the assistant (D-103).
 
 ## Training
 
-QLoRA on top of a 4-bit (nf4, double quantization, bf16 compute) base: LoRA rank 16, alpha 32, dropout 0.05 on all attention and MLP projections (0.46% of the parameters), learning rate 1e-4 with cosine decay and 3% warmup, effective batch 16, one epoch = 94 optimizer steps, loss on assistant tokens only, seed 42. One NVIDIA H100 NVL, about 24 minutes per seed. Three seeds were trained (42, 43, 44). Seed 42 is the primary seed of the pre-registered evaluation plan and was accepted by the project owner after the pilot evaluation; it is the released adapter. It was **not** the best of the three on `bench_v2` in HF: key accuracy 0.9505 (seed 42), 0.973 (seed 43), 0.964 (seed 44), i.e. the spread between seeds is about two points.
+QLoRA on top of a 4-bit (nf4, double quantization, bf16 compute) base: LoRA rank 16, alpha 32, dropout 0.05 on all attention and MLP projections (0.46% of the parameters), learning rate 1e-4 with cosine decay and 3% warmup, effective batch 16, one epoch = 94 optimizer steps, loss on assistant tokens only, seed 42. One NVIDIA H100 NVL, about 24 minutes per seed. Three seeds were trained (42, 43, 44). Seed 42 is the primary seed of the pre-registered evaluation plan and was accepted by the author after the pilot evaluation; it is the released adapter. It was **not** the best of the three on `bench_v2` in HF: key accuracy 0.9505 (seed 42), 0.973 (seed 43), 0.964 (seed 44), i.e. the spread between seeds is about two points.
 
 ## Evaluation
 
@@ -78,13 +78,13 @@ Benchmark `bench_v2` (271 requests), greedy decoding, **no JSON schema**, the re
 |---|---|---|
 | P1 json_valid_rate >= 0.98 | 0.9889 [0.974; 1.000] | met |
 | P2 key_field_accuracy >= 0.95 | 0.9505 [0.918; 0.978], 211 of 222 cases, zero margin | met |
-| P3 zero hallucinated_required_field, hallucinated_condition, missed_condition in the hard slice | 0 / 0 / 1 (one unscored failed answer in the slice) | not met, exception accepted |
-| P3m at most 2 of those errors on the 33 mock requests | 4 | not met, exception accepted |
+| P3 zero hallucinated_required_field, hallucinated_condition, missed_condition in the hard slice | 0 / 0 / 1 (one unscored failed answer in the slice) | not met (D-128) |
+| P3m at most 2 of those errors on the 33 mock requests | 4 | not met (D-128) |
 | P4 gain over the base model >= 5 pp (same backend and mode) | +0.946 [0.912; 0.973] (0.0045 to 0.9505) | met |
 | P5 quantization loss vs BF16 GGUF <= 2 pp and no new critical errors of the three P3 kinds | key +0.009, 0 new of the three kinds (Q6_K, llama.cpp); counting all kinds 1 new (`missed_conflict`, one mock request) | met as approved (three kinds); not met if all kinds are counted |
 | P6 better than the regex baseline: key >= 0.874, mocks > 0.704 | 0.9505 and 0.741 (27 cases) | met |
 
-The two unmet gates (P3, P3m) were accepted as exceptions by the project owner; the results are reported as they are and compared across systems below. P5 is counted as approved in the plan, over the three P3 error kinds (decision D-125); counting every kind of critical error, as an earlier check did by mistake, Q6_K has one new error (a missed conflict on a mock request) and P5 would not be met. Both readings are shown on purpose.
+The two unmet gates (P3, P3m) are reported as they are (D-128) and compared across systems below. P5 is counted as approved in the plan, over the three P3 error kinds (decision D-125); counting every kind of critical error, as an earlier check did by mistake, Q6_K has one new error (a missed conflict on a mock request) and P5 would not be met. Both readings are shown on purpose.
 
 Other metrics of the same run (95% CI): field accuracy (micro) 0.9781 [0.965; 0.988]; special conditions exactly right 0.9631 [0.937; 0.985]; condition precision 0.9792 [0.955; 0.996], recall 0.9874 [0.971; 1.000]; `missing_fields` F1 0.8877 [0.825; 0.938], exact 0.9336 [0.900; 0.963]; conflict recall 1.0 (19 cases); hallucination rate 0.041 [0.019; 0.067]. Key-field accuracy by slice: clean 1.000 (51), conditions 0.987 (77), hard 0.953 (64), missing 1.000 (3), mock requests 0.741 (27); Russian 0.937 (142), English 0.975 (80); in-distribution 0.947, out-of-distribution 0.958.
 
@@ -114,9 +114,9 @@ Latency p50 6.4 s, p95 9.7 s for a request of about 1130 prompt tokens (p95 1182
 - **Synthetic labels.** `cargo_category` is a proxy derived from the customer; equipment types and special conditions come from a table, not from real shipments.
 - **Known weak spots:** unfamiliar request styles (glued thousands separators, slang such as "борт" or "реф"), requests written like informal emails (two mock requests are answered with values outside the allowed lists and fail strict parsing).
 - **The model does not calculate.** Unit conversion, total weight, the missing-fields rule and plausibility checks are done by code; the model's own `missing_fields` should not be trusted.
-- **Gates.** P3 and P3m are not met (accepted exceptions); P2 passes with zero margin; results shift by about one point between inference engines.
+- **Gates.** P3 and P3m are not met; P2 passes with zero margin; results shift by about one point between inference engines.
 - Context tested at 4096 tokens (prompts up to about 3.4k). Single user; no concurrency test.
-- The pipeline code, the data generator and the mock requests were written with an AI coding assistant (Claude Code) under the owner's direction; the owner accepted the results of each step but did not review every record.
+- The pipeline code, the data generator and the mock requests were written with an AI coding assistant (Claude Code) under the author's direction; each step's results were accepted by the author, but not every record was reviewed.
 - Not for legal, compliance or financial conclusions.
 
 ## Reproduction
@@ -146,4 +146,4 @@ The Q6_K file was made by quantizing the BF16 GGUF with the pinned `llama-quanti
 
 ## License and attribution
 
-Apache-2.0, as the base model. Base model: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Data source: Yogape Rodriguez (2025), `yogape/logistics-operations`, MIT licence. This release has not been uploaded anywhere; publishing is a separate decision of the project owner.
+Apache-2.0, as the base model. Base model: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Data source: Yogape Rodriguez (2025), `yogape/logistics-operations`, MIT licence. This release has not been uploaded anywhere yet; it is published only by the author's decision.

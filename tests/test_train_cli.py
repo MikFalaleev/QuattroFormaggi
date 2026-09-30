@@ -30,7 +30,7 @@ from tests.tiny_training import (  # noqa: E402
     tiny_project,
 )
 
-APPROVAL = "user, 2026-09-25: «Да, разрешаю»"
+APPROVAL = "автор проекта, 2026-09-25: разрешено"
 PAID = {"gpu_hourly_rate": 1.0, "max_cost": 100.0}  # a paid run that fits the budget
 
 
