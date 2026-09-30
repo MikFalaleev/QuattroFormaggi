@@ -59,8 +59,11 @@ from qf.domain.units import (
     to_kg,
     to_m,
 )
+from qf.domain.validation import MAX_PLAUSIBLE_WEIGHT_KG, check_card_values
 
 __all__ = [
+    "MAX_PLAUSIBLE_WEIGHT_KG",
+    "check_card_values",
     "BASE_REQUIRED_ORDER_V2",
     "CM_TO_M",
     "CONDITION_MISSING_NAMES",

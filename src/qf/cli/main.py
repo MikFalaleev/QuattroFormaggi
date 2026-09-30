@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 
 from qf import __version__
 from qf.cli.command_log import list_runs, record_command
-from qf.cli.commands import bench, data, doctor, export, tokens, train, ui
+from qf.cli.commands import bench, data, doctor, export, extract, tokens, train, ui
 from qf.cli.commands import eval as eval_cmd
 from qf.common import NotImplementedStageError, QFError, setup_logging
 
@@ -215,7 +215,13 @@ _SPECS = (
         export.run_gguf,
         export.configure_gguf,
     ),
-    CommandSpec("extract", "18", "extract a shipment card from a request"),
+    CommandSpec(
+        "extract",
+        "18",
+        "extract a shipment card from a request with the local model, checked by code",
+        extract.run,
+        extract.configure,
+    ),
     CommandSpec("release check", "19", "check release completeness"),
     CommandSpec("lab", "L1-L6", "QF-Lab from-scratch Transformer track"),
 )

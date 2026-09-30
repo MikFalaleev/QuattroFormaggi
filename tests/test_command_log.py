@@ -17,11 +17,11 @@ def lines(path: Path) -> list[dict[str, object]]:
 
 
 def test_every_command_is_logged(tmp_path: Path) -> None:
-    assert main(["extract"]) == 2
+    assert main(["release", "check"]) == 2
     assert main(["train", "fetch-base"]) == 1  # refused: still logged
     logged = lines(tmp_path / "commands.jsonl")
     assert [(entry["argv"], entry["exit_code"]) for entry in logged] == [
-        (["extract"], 2),
+        (["release", "check"], 2),
         (["train", "fetch-base"], 1),
     ]
     assert all(entry["machine"] and entry["seconds"] >= 0 for entry in logged)
@@ -37,7 +37,7 @@ def test_default_path_is_per_machine_in_the_project(
     assert path is not None and path.parent == fake_project / "runs"
     assert re.fullmatch(r"commands-darwin-[0-9a-f]{6}\.jsonl", path.name)
     (fake_project / "runs" / "20260925-000000-x-aaaaaa").mkdir(parents=True)
-    assert main(["extract"]) == 2
+    assert main(["release", "check"]) == 2
     entry = lines(path)[0]
     assert entry["new_runs"] == [] and "Someone" not in json.dumps(entry)
 
