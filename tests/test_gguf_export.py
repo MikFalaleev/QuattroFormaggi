@@ -199,6 +199,26 @@ def test_cli_gguf_and_verify(fake_project: Path, monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.usefixtures("pinned")
+def test_cli_gguf_qtypes_none_converts_only(
+    fake_project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """D-129: restores the BF16 parent of a quantized file where no llama-quantize exists."""
+    hf_dir(fake_project)
+    gguf_config(fake_project)
+    calls = FakeTools()
+    monkeypatch.setattr(llama_cpp.subprocess, "run", calls)
+    argv = ["export", "gguf", "--source", SOURCE.as_posix(), "--name", "t", "--qtypes", "none"]
+    assert main(argv) == 0
+    out = capsys.readouterr().out
+    assert "artifacts/gguf/t-BF16.gguf" in out and "Q4_K_M" not in out
+    assert not any("quantize" in " ".join(map(str, args)) for args, _ in calls.calls)
+    assert any(args[1].endswith("convert_hf_to_gguf.py") for args, _ in calls.calls)
+    assert (
+        main(["export", "gguf", "--source", SOURCE.as_posix(), "--name", "u", "--qtypes", ""]) == 1
+    )  # an empty list is still refused
+
+
+@pytest.mark.usefixtures("pinned")
 def test_cli_gguf_fails_on_a_metadata_mismatch(
     fake_project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

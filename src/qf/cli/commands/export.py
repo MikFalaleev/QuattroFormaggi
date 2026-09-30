@@ -252,7 +252,8 @@ def configure_gguf(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--name", required=True,
                         help="file prefix: artifacts/gguf/<name>-<TYPE>.gguf")  # fmt: skip
     parser.add_argument("--qtypes", default="Q4_K_M",
-                        help="comma-separated quantization types, e.g. Q4_K_M,Q5_K_M")  # fmt: skip
+                        help="comma-separated quantization types, e.g. Q4_K_M,Q5_K_M; "
+                             "`none` = only the BF16 conversion")  # fmt: skip
     parser.add_argument("--config", type=Path, default=GGUF_CONFIG,
                         help="the converter and the quantizer (pinned llama.cpp)")  # fmt: skip
 
@@ -261,18 +262,33 @@ def run_gguf(args: argparse.Namespace) -> int:
     """HF model -> GGUF (bf16) -> quantized GGUFs; metadata checked against the HF model."""
     root = project_root()
     cfg = _gguf_config(args.config, root)
-    qtypes = [q.strip() for q in args.qtypes.split(",") if q.strip()]
-    if not qtypes or any(not q.replace("_", "").isalnum() for q in qtypes):
-        raise QFError(f"--qtypes {args.qtypes!r}: expected e.g. Q4_K_M,Q5_K_M")
+    # `--qtypes none`: only the converter's own output type (BF16), e.g. to restore the parent
+    # of a quantized file on a machine that has no llama-quantize (step 19, D-129)
+    qtypes = (
+        []
+        if args.qtypes.strip().lower() == "none"
+        else [q.strip() for q in args.qtypes.split(",") if q.strip()]
+    )
+    if (not qtypes and args.qtypes.strip().lower() != "none") or any(
+        not q.replace("_", "").isalnum() for q in qtypes
+    ):
+        raise QFError(f"--qtypes {args.qtypes!r}: expected e.g. Q4_K_M,Q5_K_M or none")
     source = args.source if not args.source.is_absolute() else args.source.relative_to(root)
     parents = _source_parents(source, root)
-    converter, quantizer = build(CONVERTERS, cfg.converter), build(QUANTIZERS, cfg.quantizer)
+    converter = build(CONVERTERS, cfg.converter)
+    quantizer = build(QUANTIZERS, cfg.quantizer) if qtypes else None
     run = start_run("export-gguf", root)
     run.run_dir.mkdir(parents=True, exist_ok=True)
     full = converter.convert(source, cfg.out_dir / f"{args.name}-{cfg.outtype.upper()}.gguf",
                              outtype=cfg.outtype, run_id=run.run_id, parents=parents)  # fmt: skip
-    refs = [full] + [quantizer.quantize(full, cfg.out_dir / f"{args.name}-{q}.gguf", qtype=q,
-                                        run_id=run.run_id) for q in qtypes]  # fmt: skip
+    refs = [full]
+    for q in qtypes:
+        assert quantizer is not None
+        refs.append(
+            quantizer.quantize(
+                full, cfg.out_dir / f"{args.name}-{q}.gguf", qtype=q, run_id=run.run_id
+            )
+        )
     report = {ref.path.as_posix(): {"sha256": ref.sha256,
                                     **_gguf_facts(root / ref.path, root / source,
                                                   root / cfg.gguf_py)}
