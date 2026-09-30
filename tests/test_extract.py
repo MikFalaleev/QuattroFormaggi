@@ -200,3 +200,18 @@ def test_cli_json_and_exit_code_of_invalid_output(
     assert main(args) == 1
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "invalid_output" and result["review_required"] is True
+
+
+@pytest.mark.lmstudio
+def test_extract_on_live_lmstudio() -> None:
+    """Step 18: `qf extract` against the release model loaded in LM Studio (Q6_K, ctx 4096)."""
+    from qf.backends import OpenAILocalBackend
+
+    live = OpenAILocalBackend(OpenAILocalBackend.Config(
+        model_substring="quattro-formaggi", expected_context=4096))  # fmt: skip
+    result = extract_card(TEXT, REQUEST_DATE, "ru", live)
+    assert result.status == "ok", result.error
+    assert result.card is not None and result.card["equipment_type"] == "reefer"
+    assert result.card["pieces"] == 18 and result.derived.weight_total_kg == 12600.0
+    assert result.missing_fields == ["pickup_date"]  # the text names no loading date
+    assert result.warnings == []
