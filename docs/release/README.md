@@ -13,6 +13,8 @@ tags:
 - qlora
 ---
 
+![Quattro Formaggi: from requests to validated cargo records](qf-banner-en.png)
+
 # Quattro-Formaggi-12B-Logistics-v0.1
 
 A **derived model**: `mistralai/Mistral-Nemo-Instruct-2407` (revision `04d8a90549d23fc6bd7f642064003592df51e9b3`, Apache-2.0) fine-tuned with a QLoRA adapter for **one task**: turning a free-text freight request (Russian or English) into a structured shipment card (JSON) plus a list of missing fields and conflicts. Renaming does not create new weights: the only change is the LoRA adapter merged into the base model. The tokenizer, chat template and vocabulary of the base model are unchanged.
@@ -28,7 +30,7 @@ Status: **v0.1, research release.** It was trained and measured on **synthetic**
 | merged | merged bf16 HF package (safetensors) | 88e51a679e6e |
 | adapter | LoRA adapter, seed 42 (r=16) | ef058b72eadc |
 
-GGUF files were built with llama.cpp `42916d83f4a225e56709f873aa8050ac11f5b6a4`, the engine of LM Studio 0.4.25. Rebuilding the BF16 GGUF on a different machine gave a byte-identical file.
+GGUF files were built with llama.cpp `42916d83f4a225e56709f873aa8050ac11f5b6a4`, the commit of LM Studio's llama.cpp runtime 2.44.0. Rebuilding the BF16 GGUF on a different machine gave a byte-identical file.
 
 ## Intended use
 
@@ -72,7 +74,7 @@ Fully synthetic. Requests are rendered by deterministic templates (8 template fa
 
 `bench_v2` contains 238 synthetic records and **33 requests written by the project's coding assistant to look like live emails ("mocks")**; it holds **no real customer requests**. Special conditions appear in about 44% of the training records (660 of 1500) and in 56% of `bench_v2` (152 of 271).
 
-**Human review share: 0 records reviewed one by one.** Gold answers are computed by code. The author read curated samples of the generated data and accepted the benchmark review in bulk: the review verdicts of `bench_v2` (276 ok, 0 fixed, 0 dropped) are the coding assistant's own preliminary verdicts, copied without changes (D-102); the 33 mock requests and their gold cards were written by the assistant (D-103).
+**Human review: all 271 records of `bench_v2` were reviewed by the author; the training splits were reviewed only as samples.** Gold answers are computed by code. The formal review-verdicts file (276 ok, 0 fixed, 0 dropped) holds the coding assistant's preliminary verdicts, copied without changes (D-102), so no per-record human verdict protocol exists among the artifacts; the 33 mock requests and their gold cards were written by the assistant (D-103).
 
 ## Training
 
@@ -80,7 +82,7 @@ QLoRA on top of a 4-bit (nf4, double quantization, bf16 compute) base: LoRA rank
 
 ## Evaluation
 
-Benchmark `bench_v2` (271 requests), greedy decoding, **no JSON schema**, the release GGUF in LM Studio 0.4.25+1 on an Apple M4 Max (context 4096). Intervals are 95% bootstrap. The release gates were approved before training and were not changed afterwards.
+Benchmark `bench_v2` (271 requests), greedy decoding, **no JSON schema**, the release GGUF in LM Studio 0.4.25+1 on an Apple M4 Max (context 4096; llama.cpp runtime 2.47.0, `llama-server` commit `6c7a87f`, a different llama.cpp commit from the one the files were built with). Intervals are 95% bootstrap. The release gates were approved before training and were not changed afterwards.
 
 | Gate | Measured | Verdict |
 |---|---|---|
@@ -109,7 +111,7 @@ Other metrics of the same run (95% CI): field accuracy (micro) 0.9781 [0.965; 0.
 | **merged Q6_K GGUF, LM Studio** | 0.989 | 0.9505 | 0 / 0 / 1 | 4 | 0.741 |
 | merged Q6_K GGUF, LM Studio, JSON schema on | 1.000 | 0.955 | 0 / 0 / 1 | 5 | 0.778 |
 
-Near-equivalent variants of the same model differ by about one percentage point in key accuracy and by 0 to 2 in P3, so the thresholds on rare events sit inside the noise between systems; the cause of the difference between engines was not investigated. Quantization (llama.cpp, vs BF16 GGUF): Q8_0, Q6_K and Q4_K_M are within 1 pp on key accuracy; Q6_K was chosen as the release format (Q5_K_M and Q4_K_M add new critical errors of the three kinds: 3 and 1; Q8_0: 1). On held-out splits (adapter, HF, seed 42): test 0.994, test_ood 0.946 (template T7 0.86: a thousands separator glued to the unit, "7 718кг", is read as 718).
+Near-equivalent variants of the same model differ by about one percentage point in key accuracy and by 0 to 2 in P3, so the thresholds on rare events sit inside the noise between systems; the cause of the difference between engines was not investigated (the LM Studio runtime differs from the `llama-server` runs both in the llama.cpp commit and in the compute platform). Quantization (llama.cpp, vs BF16 GGUF): Q8_0, Q6_K and Q4_K_M are within 1 pp on key accuracy; Q6_K was chosen as the release format (Q5_K_M and Q4_K_M add new critical errors of the three kinds: 3 and 1; Q8_0: 1). On held-out splits (adapter, HF, seed 42): test 0.994, test_ood 0.946 (template T7 0.86: a thousands separator glued to the unit, "7 718кг", is read as 718).
 
 ## Performance (Apple M4 Max, 36 GB, LM Studio, Q6_K, one request at a time)
 
@@ -124,7 +126,7 @@ Latency p50 6.4 s, p95 9.7 s for a request of about 1130 prompt tokens (p95 1182
 - **The model does not calculate.** Unit conversion, total weight, the missing-fields rule and plausibility checks are done by code; the model's own `missing_fields` should not be trusted.
 - **Gates.** P3 and P3m are not met; P2 passes with zero margin; results shift by about one point between inference engines.
 - Context tested at 4096 tokens (prompts up to about 3.4k). Single user; no concurrency test.
-- The pipeline code, the data generator and the mock requests were written with an AI coding assistant (Claude Code) under the author's direction; each step's results were accepted by the author, but not every record was reviewed.
+- The pipeline code, the data generator and the mock requests were written with an AI coding assistant (Claude Code) under the author's direction; each step's results were accepted by the author; all benchmark records were reviewed by the author, training records only as samples.
 - Not for legal, compliance or financial conclusions.
 
 ## Reproduction
