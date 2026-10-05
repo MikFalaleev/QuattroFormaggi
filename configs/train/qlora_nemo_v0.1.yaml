@@ -53,7 +53,7 @@ logging:
   external_reporting: false
   record_peak_memory: true
 budget:
-  gpu_hourly_rate: 368.18            # Immers.cloud h100nvl-1.16.96.240 + IP, per-second billing (28.09.2026, D-119)
+  gpu_hourly_rate: 368.18            # Immers.cloud rented H100 NVL server + IP, per-second billing (28.09.2026, D-119)
   measured_tokens_per_s: null        # measured by the GPU smoke run (step 13)
   max_cost: 740                      # the training loop only: 120 min × 368.18 = 736.36 (D-119)
   currency: RUB

@@ -35,3 +35,16 @@ CLAUDE.local.md
 .claude/
 # llama.cpp build outside the submodule (step 17): keeps the submodule clean
 /third_party/llama.cpp-build/
+
+# Private by the owner's decision (open-source release): editor workspaces, secrets, local publication material
+*.code-workspace
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.token
+.cache/
+.huggingface/
+# research/ already covers the journal (research/JOURNAL.md), experiment cards, reviews and publication drafts

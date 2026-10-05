@@ -62,7 +62,7 @@ The project command `qf extract` does the rest: it builds the messages exactly a
 
 ## Training data
 
-Fully synthetic. Requests are rendered by deterministic templates (8 template families, Russian 60% and English 40%) from rows of four tables of `yogape/logistics-operations` (revision `54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07`, MIT; Yogape Rodriguez, 2025): `loads`, `routes`, `customers`, `delivery_events`. The source is a fictional US trucking company; its cities are mapped to 20 Russian cities by a fixed, versioned table. Gold answers are computed by code from the rows and the rendered text, never by an LLM or by hand. Equipment types and special conditions are assigned by a versioned table, not taken from the source. The `drivers` table (personal-data-shaped) was never downloaded.
+Fully synthetic. Requests are rendered by deterministic templates (8 template families, Russian 60% and English 40%) from rows of four tables of `yogape/logistics-operations` (revision `54e7d1d1a437ac9d9b287d3ce3ad0edea6aa7a07`, MIT; Yogape Rodriguez, 2025): `loads`, `routes`, `customers`, `delivery_events`. The source is a fictional US trucking company; its cities are mapped to 20 Russian cities by a fixed, versioned table. For template records, gold answers are computed by code from the rows and the rendered text, never by an LLM or by hand; the 33 mock requests of `bench_v2` are the exception (written by an AI assistant, see Limitations). Equipment types and special conditions are assigned by a versioned table, not taken from the source. The `drivers` table (personal-data-shaped) was never downloaded.
 
 | Split | Records | sha256 (first 12) | Use |
 |---|---:|---|---|
@@ -74,11 +74,11 @@ Fully synthetic. Requests are rendered by deterministic templates (8 template fa
 
 `bench_v2` contains 238 synthetic records and **33 requests written by the project's coding assistant to look like live emails ("mocks")**; it holds **no real customer requests**. Special conditions appear in about 44% of the training records (660 of 1500) and in 56% of `bench_v2` (152 of 271).
 
-**Human review: all 271 records of `bench_v2` were reviewed by the author; the training splits were reviewed only as samples.** Gold answers are computed by code. The formal review-verdicts file (276 ok, 0 fixed, 0 dropped) holds the coding assistant's preliminary verdicts, copied without changes (D-102), so no per-record human verdict protocol exists among the artifacts; the 33 mock requests and their gold cards were written by the assistant (D-103).
+**Human review: all 271 records of `bench_v2` were reviewed by the author; the training splits were reviewed only as samples.** For template records gold answers are computed by code; the cards of the 33 mock requests were written by the assistant, and only their canonicalisation and missing-field list are computed by code. The formal review-verdicts file (276 ok, 0 fixed, 0 dropped) holds the coding assistant's preliminary verdicts, copied without changes (D-102), so no per-record human verdict protocol exists among the artifacts; the 33 mock requests and their gold cards were written by the assistant (D-103).
 
 ## Training
 
-QLoRA on top of a 4-bit (nf4, double quantization, bf16 compute) base: LoRA rank 16, alpha 32, dropout 0.05 on all attention and MLP projections (0.46% of the parameters), learning rate 1e-4 with cosine decay and 3% warmup, effective batch 16, one epoch = 94 optimizer steps, loss on assistant tokens only, seed 42. One NVIDIA H100 NVL, about 24 minutes per seed. Three seeds were trained (42, 43, 44). Seed 42 is the primary seed of the pre-registered evaluation plan and was accepted by the author after the pilot evaluation; it is the released adapter. It was **not** the best of the three on `bench_v2` in HF: key accuracy 0.9505 (seed 42), 0.973 (seed 43), 0.964 (seed 44), i.e. the spread between seeds is about two points.
+QLoRA on top of a 4-bit (nf4, double quantization, bf16 compute) base: LoRA rank 16, alpha 32, dropout 0.05 on all attention and MLP projections (0.46% of the parameters), learning rate 1e-4 with cosine decay and 3% warmup, effective batch 16, one epoch = 94 optimizer steps, loss on assistant tokens only, seed 42. One NVIDIA H100 NVL, 24 to 29 minutes per seed. Three seeds were trained (42, 43, 44). Seed 42 is the primary seed of the evaluation plan recorded in the project log before the runs (not an external pre-registration) and was accepted by the author after the pilot evaluation; it is the released adapter. It was **not** the best of the three on `bench_v2` in HF: key accuracy 0.9505 (seed 42), 0.973 (seed 43), 0.964 (seed 44), i.e. the spread between seeds is about two points.
 
 ## Evaluation
 
@@ -111,7 +111,7 @@ Other metrics of the same run (95% CI): field accuracy (micro) 0.9781 [0.965; 0.
 | **merged Q6_K GGUF, LM Studio** | 0.989 | 0.9505 | 0 / 0 / 1 | 4 | 0.741 |
 | merged Q6_K GGUF, LM Studio, JSON schema on | 1.000 | 0.955 | 0 / 0 / 1 | 5 | 0.778 |
 
-Near-equivalent variants of the same model differ by about one percentage point in key accuracy and by 0 to 2 in P3, so the thresholds on rare events sit inside the noise between systems; the cause of the difference between engines was not investigated (the LM Studio runtime differs from the `llama-server` runs both in the llama.cpp commit and in the compute platform). Quantization (llama.cpp, vs BF16 GGUF): Q8_0, Q6_K and Q4_K_M are within 1 pp on key accuracy; Q6_K was chosen as the release format (Q5_K_M and Q4_K_M add new critical errors of the three kinds: 3 and 1; Q8_0: 1). On held-out splits (adapter, HF, seed 42): test 0.994, test_ood 0.946 (template T7 0.86: a thousands separator glued to the unit, "7 718кг", is read as 718).
+Near-equivalent variants of the same model differ by about one percentage point in key accuracy and by 0 to 2 in P3, so the thresholds on rare events are sensitive to the configuration; random noise was not separated from the effect of the engine, platform or weight representation, and the cause of the difference between engines was not investigated (the LM Studio runtime differs from the `llama-server` runs both in the llama.cpp commit and in the compute platform). Quantization (llama.cpp, vs BF16 GGUF): Q8_0, Q6_K and Q4_K_M are within 1 pp on key accuracy; Q6_K was chosen as the release format (Q5_K_M and Q4_K_M add new critical errors of the three kinds: 3 and 1; Q8_0: 1). On held-out splits (adapter, HF, seed 42): test 0.994, test_ood 0.946 (template T7 0.86: a thousands separator glued to the unit, "7 718кг", is read as 718).
 
 ## Performance (Apple M4 Max, 36 GB, LM Studio, Q6_K, one request at a time)
 
@@ -152,7 +152,7 @@ uv run qf eval-baseline --config configs/eval/lmstudio_merged_q6k_bench_v2.yaml 
 uv run qf release check                  # artifacts, lineage to the raw dataset, this card
 ```
 
-The Q6_K file was made by quantizing the BF16 GGUF with the pinned `llama-quantize` through a small script of the project (`research/tools/qf_quantize_extra.py`, run `20260929-070902-export-quantize-cc97f9`), which is **not part of the repository's commands**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` uses the same quantizer for other types, but reproducing Q6_K with a `qf` command itself has not been verified. Configs are in `configs/`; the decisions behind every choice are in `docs/DECISIONS.md` (D-012 to D-131) and the metric definitions in `docs/EVAL_SPEC.md`.
+The Q6_K file was made by quantizing the BF16 GGUF with the pinned `llama-quantize` through a small helper script of the project, which is **not part of the repository's commands** and is not published; `qf export gguf --qtypes Q4_K_M,Q5_K_M` uses the same quantizer for other types, but reproducing Q6_K with a `qf` command itself has not been verified. Configs are in `configs/`; the decisions behind every choice are in `docs/DECISIONS.md` (D-012 to D-131) and the metric definitions in `docs/EVAL_SPEC.md`.
 
 ## License and attribution
 

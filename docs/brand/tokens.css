@@ -1,0 +1,17 @@
+:root {
+  --qf-bg: #0B0F0D;
+  --qf-surface: #151C18;
+  --qf-line: #34473B;
+  --qf-green: #8FEA83;
+  --qf-white: #F3F5F0;
+  --qf-muted: #B4C3B7;
+  --qf-ink: #17241C;
+  --qf-paper: #F6F8F4;
+  --qf-darkgreen: #246C30;
+  --qf-amber: #FFD080;
+  --qf-red: #FF9C9C;
+  --qf-display: "DejaVu Sans Mono", monospace;
+  --qf-body: "DejaVu Sans", sans-serif;
+  --qf-radius: 12px;
+  --qf-space: 8px;
+}

@@ -1,4 +1,13 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logos/qf-logo-transparent-dark.svg">
+    <img src="docs/brand/logos/qf-logo-transparent-light.svg" alt="Quattro Formaggi: знак > qf_" width="360">
+  </picture>
+</p>
+
 # Quattro Formaggi
+
+**От заявки к проверяемой карточке.**
 
 Воспроизводимый проект дообучения и оценки локальной языковой модели для логистики:
 
@@ -12,7 +21,7 @@
 - **Данные** (шаги 2–8, подшаги V1–V6): закреплённый табличный датасет `yogape/logistics-operations` (MIT) → факты о 85 410 загрузках с российскими городами → синтетические заявки по детерминированным шаблонам; эталоны вычисляет код, не LLM. `generated_v2`: 1 500 train / 150 val / 600 test / 300 test_ood. Замороженный benchmark `bench_v2` — 271 запись, из них 33 заявки-макета, написанные ассистентом; настоящих заявок нет.
 - **Оценка** (шаги 9–10): 26 метрик, критические ошибки, bootstrap-интервалы, McNemar; пороги релиза П1–П6 утверждены до обучения (`docs/EVAL_SPEC.md`, D-112).
 - **Обучение** (шаги 11–13, D-118): QLoRA r=16 (0,46% параметров), одна эпоха, три seed на арендованной H100 NVL, около 24 минут и 150 ₽ на seed.
-- **Экспорт** (шаги 14–17): оценка адаптера в HF, резервная копия, слияние в bf16 (воспроизводится побайтно), GGUF закреплённым llama.cpp `42916d83` — движком LM Studio 0.4.25.
+- **Экспорт** (шаги 14–17): оценка адаптера в HF, резервная копия, слияние в bf16 (воспроизводится побайтно), GGUF закреплённым llama.cpp `42916d83` (его содержал runtime LM Studio 2.44.0; при приёмке был активен runtime 2.47.0 на коммите `6c7a87f`, см. D-132).
 
 **Результаты на `bench_v2`** (271 заявка, жадная генерация, без JSON-схемы):
 
@@ -45,9 +54,9 @@
 
 **Ограничения:** только синтетические заявки, качество на настоящих письмах не измерено (на макетах key 0,67–0,82 в зависимости от seed и формата); 20 российских городов; незнакомые шаблоны заявок (test_ood T7 — 0,86) и жаргон. Перечень доработок — `docs/TODO.md`.
 
-Все решения — `docs/DECISIONS.md` (D-012…D-131); журнал исследования и карточки экспериментов ведутся вне Git.
+Все решения — `docs/DECISIONS.md` (D-012…D-132); журнал исследования и карточки экспериментов ведутся вне Git.
 
-Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/EVAL_SPEC.md`, `docs/DATA_SPEC.md`, `docs/MODEL_CARD.md`, `docs/TODO.md`, `docs/PLAN_card_v2.md` (план карточки `card_v2`), `AGENTS.md` (правила для coding agents).
+Документы: `Quattro_Formaggi_DEVELOPMENT_PLAN.md` (план разработки), `IMPLEMENTATION_PLAN.md` (пошаговый план), `docs/PROJECT.md` (паспорт проекта), `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/EVAL_SPEC.md`, `docs/DATA_SPEC.md`, `docs/MODEL_CARD.md`, `docs/brand/` (дизайн-система: логотипы, цвета, шрифты, баннеры), `docs/TODO.md`, `docs/PLAN_card_v2.md` (план карточки `card_v2`), `AGENTS.md` (правила для coding agents).
 
 ## Быстрый старт
 

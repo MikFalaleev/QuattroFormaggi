@@ -22,7 +22,7 @@ seeds: [42, 43, 44]  # 42 is the pilot; 43 and 44 only if time and balance allow
 requires_approval: true
 notes: >-
   Amended 2026-09-28, before any run (D-119): the user rented 1x H100 NVL 94 GB
-  (h100nvl-1.16.96.240, 368.18 RUB/h with the IP) instead of 1x A100 80 GB (231.17 RUB/h).
+  (rented H100 NVL server, 368.18 RUB/h with the IP) instead of 1x A100 80 GB (231.17 RUB/h).
   Only the budget changed: gpu_hourly_rate and max_cost (500 -> 740 RUB; 120 min x 368.18 = 736.36); the time limit and every
   training parameter are as registered, so config_sha256 was recomputed. Hypotheses are
   unchanged: the memory and speed ranges were derived for A100.
