@@ -139,6 +139,22 @@ uv run qf release check                  # артефакты, родослов�
 
 Файл Q6_K получен квантованием BF16-GGUF закреплённым `llama-quantize` через небольшой вспомогательный скрипт проекта, который **не входит в команды репозитория и не опубликован**; `qf export gguf --qtypes Q4_K_M,Q5_K_M` использует тот же квантователь для других типов, но воспроизведение Q6_K самой командой `qf` не проверялось. Конфиги — в `configs/`; решения, стоящие за каждым выбором, — `docs/DECISIONS.md` (D-012…D-131), определения метрик — `docs/EVAL_SPEC.md`.
 
+## Как цитировать
+
+Технический отчёт (на английском): Falaleev M. *Quattro Formaggi: Local Parsing of Freight Requests with a Fine-Tuned Language Model.* Zenodo, 2026. https://doi.org/10.5281/zenodo.23188452
+
+```bibtex
+@techreport{falaleev2026quattroformaggi,
+  author      = {Falaleev, Mikhail},
+  title       = {Quattro Formaggi: Local Parsing of Freight Requests with a Fine-Tuned Language Model},
+  institution = {Zenodo},
+  type        = {Technical note},
+  year        = {2026},
+  doi         = {10.5281/zenodo.23188452},
+  url         = {https://doi.org/10.5281/zenodo.23188452}
+}
+```
+
 ## Лицензия и атрибуция
 
 Apache-2.0, как у базовой модели. Базовая модель: Mistral AI, `Mistral-Nemo-Instruct-2407` (Apache-2.0). Источник данных: Yogape Rodriguez (2025), `yogape/logistics-operations`, лицензия MIT. Опубликовано автором на Hugging Face: веса и адаптер `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1`, GGUF-файлы `MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF`, синтетические данные (датасет) `MikhailSAI/Quattro-Formaggi-Logistics-Synthetic-v0.1`.

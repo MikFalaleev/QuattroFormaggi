@@ -143,7 +143,7 @@ uv run qf release check     # артефакты, родословная до с
 - Веса и адаптер: https://huggingface.co/MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1
 - GGUF (BF16 и Q6_K): https://huggingface.co/MikhailSAI/Quattro-Formaggi-12B-Logistics-v0.1-GGUF
 - Синтетические данные и `bench_v2`: https://huggingface.co/datasets/MikhailSAI/Quattro-Formaggi-Logistics-Synthetic-v0.1
-- Технический отчёт (arXiv): ссылка будет добавлена после публикации.
+- Технический отчёт (Zenodo, на английском): https://doi.org/10.5281/zenodo.23188452
 
 Системный промпт `system_extract_v2` (`src/qf/domain/prompts/system_extract_v2.txt`): SHA-256 `fa329729…` относится к тексту без завершающего перевода строки; файл с ним даёт `30f2f85e…`.
 
